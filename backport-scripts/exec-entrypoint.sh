@@ -26,6 +26,9 @@ git clone --depth 1 --branch "v${KERNEL_VERSION}" https://git.kernel.org/pub/scm
 
 cd /sched-ext-linux
 
+# this is for backports and mixing new bpf with old kernel
+find . -type f -exec sed -i 's/-Werror/-Wno-error/g' {} \;
+
 vng -v --kconfig --config /sched-ext.config
 
 make -j "$(nproc)"
