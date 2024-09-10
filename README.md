@@ -33,4 +33,8 @@ and edit files other than `vmlinux.h` until first `cargo test` (ran in this repo
 1) Create a new `-fixes` branch from either a `-vmlinux`, `-fixes` branch or a `-backport` branch (whichever is closest to what you want).
 2) Continue the instructions above from (4).
 
-*`main` will be updated periodically (roughly coinciding with releases of scx).*
+### Updating this doc and the setup scripts.
+
+Please make any updates to this document and the setup scripts on the branch `setup-repo`. This will be rebased atop `main` when merging in updates.
+
+*`main` will be updated periodically (roughly coinciding with releases of scx), backports will be updated/created on an as-needed basis.*
