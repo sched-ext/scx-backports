@@ -37,4 +37,5 @@ and edit files other than `vmlinux.h` until first `cargo test` (ran in this repo
 Please make any updates to this document and the setup scripts on the branch `setup-repo`. This will be rebased atop `main` when merging in updates.
 
 *`main` will be updated periodically (roughly coinciding with releases of scx), backports will be updated/created on an as-needed basis.*
+
 *`main` will be overwritten with commits from upstream during syncs. setup-repo will be rebased upon main and pushed to main before rebasing other branches, so put things to persist across this process on setup-repo.`
