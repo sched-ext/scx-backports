@@ -4,6 +4,7 @@ set -euxo pipefail
 
 SHORT_SHA="$1"
 BRANCH="$2"
+REPO="$3"
 
 START_PWD="$(pwd)"
 
@@ -13,14 +14,13 @@ docker build -f backport-scripts/Dockerfile -t local-build-container .
 
 BUILD_CONTAINER="$(docker run -it --rm --detach local-build-container)"
 
-docker exec -it "${BUILD_CONTAINER}" "/exec-entrypoint.sh" "${SHORT_SHA}" "${BRANCH}"
+docker exec -it "${BUILD_CONTAINER}" "/exec-entrypoint.sh" "${SHORT_SHA}" "${BRANCH}" "${REPO:=https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git}"
 
 clean_up_container () {
     ARG=$?
     docker rm -f "${BUILD_CONTAINER}"
     exit $ARG
 } 
-
 trap clean_up_container EXIT
 
 # copy artifact to host
