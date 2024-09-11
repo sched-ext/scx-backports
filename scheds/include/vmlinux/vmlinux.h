@@ -1,1 +1,1 @@
-vmlinux-v6.10-rc2-g1edab907b57d.h
+vmlinux-6.0.h
