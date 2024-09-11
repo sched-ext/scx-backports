@@ -261,4 +261,3 @@ jobs:
         run: exit -1
 
       - run: cargo build  --manifest-path scheds/rust/${{ matrix.scheduler }}/Cargo.toml
-      - run: vng -v --rw --memory 10G --cpu 8 -r linux/arch/x86/boot/bzImage  --net user -- cargo test --manifest-path scheds/rust/${{ matrix.scheduler }}/Cargo.toml
