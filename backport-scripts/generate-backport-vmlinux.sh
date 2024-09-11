@@ -2,7 +2,8 @@
 
 set -euxo pipefail
 
-KERNEL_VERSION="$1"
+SHORT_SHA="$1"
+BRANCH="$2"
 
 START_PWD="$(pwd)"
 
@@ -12,7 +13,7 @@ docker build -f backport-scripts/Dockerfile -t local-build-container .
 
 BUILD_CONTAINER="$(docker run -it --rm --detach local-build-container)"
 
-docker exec -it "${BUILD_CONTAINER}" "/exec-entrypoint.sh" "${KERNEL_VERSION}"
+docker exec -it "${BUILD_CONTAINER}" "/exec-entrypoint.sh" "${SHORT_SHA}" "${BRANCH}"
 
 clean_up_container () {
     ARG=$?
@@ -23,14 +24,14 @@ clean_up_container () {
 trap clean_up_container EXIT
 
 # copy artifact to host
-docker cp "${BUILD_CONTAINER}:/vmlinux-${KERNEL_VERSION}.h" "${REPO_ROOT}/scheds/include/vmlinux/vmlinux-${KERNEL_VERSION}.h"
+docker cp "${BUILD_CONTAINER}:/vmlinux-${SHORT_SHA}.h" "${REPO_ROOT}/scheds/include/vmlinux/vmlinux-${SHORT_SHA}.h"
 
 # update vmlinux.h symlink
-ln -sf "${REPO_ROOT}/scheds/include/vmlinux/vmlinux-${KERNEL_VERSION}.h" "${REPO_ROOT}/scheds/include/vmlinux/vmlinux.h"
+ln -sf "${REPO_ROOT}/scheds/include/vmlinux/vmlinux-${SHORT_SHA}.h" "${REPO_ROOT}/scheds/include/vmlinux/vmlinux.h"
 
 # return to where called from
 cd "${START_PWD}"
 
-echo "updated vmlinux.h for kernel version ${KERNEL_VERSION}"
+echo "updated vmlinux.h for kernel version ${SHORT_SHA}"
 
 exit 0

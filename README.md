@@ -12,9 +12,9 @@ on kernels with older versions of the sched-ext source tree.
 
 ### Setting up a backport
 
-1) Create a branch named `${KERNEL_VERSION}-vmlinux` , where `${KERNEL_VERSION}` is the branch of the scx tree of the kernel source you are targeting.
+1) Create a branch named `$SHORT_SHA-vmlinux` , where `$SHORT_SHA` is the first 7 characters of the commit hash in the scx kernel tree you are targeting.
 
-2) Run `backport-scripts/generate-backport-vmlinux.sh` passing it a kernel version (such as `scx-dsq-iter-v5`).
+2) Run `backport-scripts/generate-backport-vmlinux.sh` passing it `$SHORT_SHA` (such as `af1234`) and branch name, in that order.
 
 3) Update the symlink `scheds/include/vmlinux/vmlinux.h` to point to your new vmlinux.h.
 
@@ -22,10 +22,10 @@ on kernels with older versions of the sched-ext source tree.
 
 5) Commit and push your branch.
 
-6) Open a new branch (i.e. `scx-dsq-iter-v5-${SCX_RELEASE}-fixes`) off of your initial branch (i.e. `scx-dsq-iter-v5-vmlinux`)
+6) Open a new branch (i.e. `af1234-${SCX_RELEASE}-fixes`) off of your initial branch (i.e. `af1234`)
 and edit files other than `vmlinux.h` until first `cargo test` (ran in this repo's root) passes and then CI passes.
 
-7) Push this branch as you get things working, push it as `scx-dsq-iter-v5-${SCX_RELEASE}-backport` once CI passes.
+7) Push this branch as you get things working, push it as `af1234-${SCX_RELEASE}-backport` once CI passes.
 
 ### Updating a backport
 
