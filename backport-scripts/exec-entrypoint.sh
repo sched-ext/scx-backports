@@ -22,8 +22,9 @@ cd /
 
 SHORT_SHA="$1"
 BRANCH="$2"
+REPO="$3"
 
-git clone -b "$BRANCH" https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git /sched-ext-linux
+git clone -b "$BRANCH" "$REPO" /sched-ext-linux
 
 cd /sched-ext-linux
 
