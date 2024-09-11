@@ -12,10 +12,9 @@ on kernels with older versions of the sched-ext source tree.
 
 ### Setting up a backport
 
-1) Create a branch named `v${KERNEL_VERSION}-vmlinux` , where `${KERNEL_VERSION}` is the kernel
-version you are targeting (i.e.`6.8`).
+1) Create a branch named `${KERNEL_VERSION}-vmlinux` , where `${KERNEL_VERSION}` is the branch of the scx tree of the kernel source you are targeting.
 
-2) Run `backport-scripts/generate-backport-vmlinux.sh` passing it a kernel version (such as `6.8`).
+2) Run `backport-scripts/generate-backport-vmlinux.sh` passing it a kernel version (such as `scx-dsq-iter-v5`).
 
 3) Update the symlink `scheds/include/vmlinux/vmlinux.h` to point to your new vmlinux.h.
 
@@ -23,10 +22,10 @@ version you are targeting (i.e.`6.8`).
 
 5) Commit and push your branch.
 
-6) Open a new branch (i.e. `v6.8-${SCX_RELEASE}-fixes`) off of your initial branch (i.e. `v6.8-vmlinux`)
+6) Open a new branch (i.e. `scx-dsq-iter-v5-${SCX_RELEASE}-fixes`) off of your initial branch (i.e. `scx-dsq-iter-v5-vmlinux`)
 and edit files other than `vmlinux.h` until first `cargo test` (ran in this repo's root) passes and then CI passes.
 
-7) Push this branch as you get things working, push it as `v6.8-${SCX_RELEASE}-backport` once CI passes.
+7) Push this branch as you get things working, push it as `scx-dsq-iter-v5-${SCX_RELEASE}-backport` once CI passes.
 
 ### Updating a backport
 
