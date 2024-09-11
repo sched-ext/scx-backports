@@ -22,7 +22,7 @@ cd /
 
 KERNEL_VERSION="$1"
 
-git clone --depth 1 --branch "v${KERNEL_VERSION}" https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git /sched-ext-linux
+git clone --depth 1 --branch "${KERNEL_VERSION}" https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git /sched-ext-linux
 
 cd /sched-ext-linux
 
