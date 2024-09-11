@@ -91,3 +91,4 @@ jobs:
       # Stress schedulers
       - run: meson compile -C build stress_tests
       - run: meson compile -C build veristat
+
