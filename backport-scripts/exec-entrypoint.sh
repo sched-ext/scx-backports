@@ -20,11 +20,14 @@ make -j "$(nproc)" install
 
 cd /
 
-KERNEL_VERSION="$1"
+SHORT_SHA="$1"
+BRANCH="$2"
 
-git clone --depth 1 --branch "${KERNEL_VERSION}" https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git /sched-ext-linux
+git clone -b "$BRANCH" https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git /sched-ext-linux
 
 cd /sched-ext-linux
+
+git checkout "$SHORT_SHA"
 
 # this is for backports and mixing new bpf with old kernel
 find . -type f -exec sed -i 's/-Werror/-Wno-error/g' {} \;
@@ -33,6 +36,6 @@ vng -v --kconfig --config /sched-ext.config
 
 make -j "$(nproc)"
 
-bpftool btf dump file "/sched-ext-linux/vmlinux" format c > "/vmlinux-${KERNEL_VERSION}.h"
+bpftool btf dump file "/sched-ext-linux/vmlinux" format c > "/vmlinux-${SHORT_SHA}.h"
 
-echo "generated vmlinux-${KERNEL_VERSION}.h"
+echo "generated vmlinux-${SHORT_SHA}.h"
