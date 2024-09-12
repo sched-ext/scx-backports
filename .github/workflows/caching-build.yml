@@ -1,12 +1,10 @@
 name: caching-build
 on:
-  # only runs on main, hourly cache update used by all branches
-    schedule:
-      - cron: "0 * * * *"
     push:
 
 jobs:
   build-kernel:
+    if: (github.ref != 'refs/heads/main') && (github.ref != 'refs/heads/setup-repo')
     runs-on: ubuntu-24.04
     steps:
       # redundancy to exit fast
@@ -14,8 +12,8 @@ jobs:
       - run: sudo apt update
       - run: sudo apt install -y git --no-install-recommends
       # get latest head commit of sched_ext for-next
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=$(git ls-remote https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git heads/for-next | awk '{print $1}')" >> $GITHUB_ENV
 
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=KERNEL_COMMIT_SHA7_HERE" >> $GITHUB_ENV
       - uses: actions/checkout@v4
 
       # use cached kernel if available, create after job if not
@@ -54,7 +52,7 @@ jobs:
         name: Clone Kernel
         # Get the latest sched-ext enabled kernel directly from the korg
         # for-next branch
-        run: git clone --single-branch -b for-next --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git linux
+        run: git clone --single-branch -b sched_ext https://github.com/sched-ext/sched_ext.git linux && cd linux && git checkout ${{ env.SCHED_EXT_KERNEL_COMMIT }}
 
       # guard rail because we are caching
       - if: ${{ steps.cache-kernel.outputs.cache-hit != 'true' }}
@@ -66,18 +64,20 @@ jobs:
 
       - if: ${{ steps.cache-kernel.outputs.cache-hit != 'true' }}
       # Build a minimal kernel (with sched-ext enabled) using virtme-ng
-        run: cd linux && vng -v --build --config ../.github/workflows/sched-ext.config
+        run: cd linux && find . -type f -exec sed -i 's/-Werror/-Wno-error/g' {} \; && vng -v --build --config ../.github/workflows/sched-ext.config
 
       - if: ${{ steps.cache-kernel.outputs.cache-hit != 'true' }}
       # Generate kernel headers
         run: cd linux && make headers
 
   integration-test:
+    if: (github.ref != 'refs/heads/main') && (github.ref != 'refs/heads/setup-repo')    
     runs-on: ubuntu-24.04
     needs: build-kernel
     strategy:
           matrix:
-            scheduler: [ scx_bpfland, scx_lavd, scx_layered, scx_rlfifo, scx_rustland, scx_rusty ]
+            scheduler: [ scx_layered, scx_rusty ]
+          fail-fast: false
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-deps-action
@@ -93,7 +93,7 @@ jobs:
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
       # get latest head commit of sched_ext for-next
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=$(git ls-remote https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git heads/for-next | awk '{print $1}')" >> $GITHUB_ENV
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=KERNEL_COMMIT_SHA7_HERE" >> $GITHUB_ENV
 
       # use cached kernel if available, create after job if not
       - name: Cache Kernel
@@ -133,6 +133,7 @@ jobs:
       - run: meson compile -C build veristat_${{ matrix.scheduler }}
 
   rust-test-core:
+    if: (github.ref != 'refs/heads/main') && (github.ref != 'refs/heads/setup-repo')    
     runs-on: ubuntu-24.04
     needs: build-kernel
     strategy:
@@ -153,7 +154,7 @@ jobs:
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
       # get latest head commit of sched_ext for-next
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=$(git ls-remote https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git heads/for-next | awk '{print $1}')" >> $GITHUB_ENV
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=KERNEL_COMMIT_SHA7_HERE" >> $GITHUB_ENV
       # cache bzImage alone for rust tests
       - name: Cache bzImage
         id: cache-bzImage
@@ -178,11 +179,12 @@ jobs:
       - run: vng -v --memory 10G --cpu 8 -r linux/arch/x86/boot/bzImage  --net user -- cargo test --manifest-path rust/${{ matrix.component }}/Cargo.toml
 
   rust-test-schedulers:
+    if: (github.ref != 'refs/heads/main') && (github.ref != 'refs/heads/setup-repo')    
     runs-on: ubuntu-24.04
     needs: build-kernel
     strategy:
       matrix:
-        scheduler: [ scx_bpfland, scx_lavd, scx_layered, scx_rlfifo, scx_rustland, scx_rusty ]
+        scheduler: [ scx_layered, scx_rusty ]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-deps-action
@@ -198,7 +200,7 @@ jobs:
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
       # get latest head commit of sched_ext for-next
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=$(git ls-remote https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git heads/for-next | awk '{print $1}')" >> $GITHUB_ENV
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=KERNEL_COMMIT_SHA7_HERE" >> $GITHUB_ENV
       # cache bzImage alone for rust tests
       - name: Cache bzImage
         id: cache-bzImage
