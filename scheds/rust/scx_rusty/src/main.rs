@@ -16,7 +16,9 @@ pub mod load_balance;
 use load_balance::LoadBalancer;
 
 mod stats;
+use core::ffi::CStr;
 use std::collections::BTreeMap;
+use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -52,11 +54,10 @@ use scx_utils::init_libbpf_logging;
 use scx_utils::scx_ops_attach;
 use scx_utils::scx_ops_load;
 use scx_utils::scx_ops_open;
-use scx_utils::uei_exited;
-use scx_utils::uei_report;
+// use scx_utils::uei_exited;
+// use scx_utils::uei_report;
 use scx_utils::Cpumask;
 use scx_utils::Topology;
-use scx_utils::UserExitInfo;
 use scx_utils::NR_CPU_IDS;
 
 const MAX_DOMS: usize = bpf_intf::consts_MAX_DOMS as usize;
@@ -432,7 +433,7 @@ impl<'a> Scheduler<'a> {
         if opts.partial {
             skel.struct_ops.rusty_mut().flags |= *compat::SCX_OPS_SWITCH_PARTIAL;
         }
-        skel.struct_ops.rusty_mut().exit_dump_len = opts.exit_dump_len;
+        // skel.struct_ops.rusty_mut().exit_dump_len = opts.exit_dump_len;
 
         skel.maps.rodata_data.load_half_life = (opts.load_half_life * 1000000000.0) as u32;
         skel.maps.rodata_data.kthreads_local = opts.kthreads_local;
@@ -566,7 +567,7 @@ impl<'a> Scheduler<'a> {
         Ok(())
     }
 
-    fn run(&mut self, shutdown: Arc<AtomicBool>) -> Result<UserExitInfo> {
+    fn run(&mut self, shutdown: Arc<AtomicBool>) -> Result<()> {
         let (res_ch, req_ch) = self.stats_server.channels();
         let now = Instant::now();
         let mut next_tune_at = now + self.tune_interval;
@@ -574,7 +575,9 @@ impl<'a> Scheduler<'a> {
 
         self.skel.maps.stats.value_size() as usize;
 
-        while !shutdown.load(Ordering::Relaxed) && !uei_exited!(&self.skel, uei) {
+        while !shutdown.load(Ordering::Relaxed)
+            && !UserExitInfo::exited(&self.skel.maps.bss_data.uei)?
+        {
             let now = Instant::now();
 
             if now >= next_tune_at {
@@ -608,7 +611,7 @@ impl<'a> Scheduler<'a> {
         }
 
         self.struct_ops.take();
-        uei_report!(&self.skel, uei)
+        UserExitInfo::read(&self.skel.maps.bss_data.uei)?.report()
     }
 }
 
@@ -669,11 +672,66 @@ fn main() -> Result<()> {
     }
 
     let mut open_object = MaybeUninit::uninit();
-    loop {
-        let mut sched = Scheduler::init(&opts, &mut open_object)?;
-        if !sched.run(shutdown.clone())?.should_restart() {
-            break;
+    let mut sched = Scheduler::init(&opts, &mut open_object)?;
+    sched.run(shutdown.clone())
+}
+
+#[derive(Debug, Default)]
+struct UserExitInfo {
+    kind: i32,
+    reason: Option<String>,
+    msg: Option<String>,
+}
+
+impl UserExitInfo {
+    fn read(bpf_uei: &types::user_exit_info) -> Result<Self> {
+        let kind = unsafe { std::ptr::read_volatile(&bpf_uei.kind as *const _) };
+
+        let (reason, msg) = if kind != 0 {
+            (
+                Some(
+                    unsafe { CStr::from_ptr(bpf_uei.reason.as_ptr() as *const _) }
+                        .to_str()
+                        .context("Failed to convert reason to string")?
+                        .to_string(),
+                )
+                .filter(|s| !s.is_empty()),
+                Some(
+                    unsafe { CStr::from_ptr(bpf_uei.msg.as_ptr() as *const _) }
+                        .to_str()
+                        .context("Failed to convert msg to string")?
+                        .to_string(),
+                )
+                .filter(|s| !s.is_empty()),
+            )
+        } else {
+            (None, None)
+        };
+
+        Ok(Self { kind, reason, msg })
+    }
+
+    fn exited(bpf_uei: &types::user_exit_info) -> Result<bool> {
+        Ok(Self::read(bpf_uei)?.kind != 0)
+    }
+
+    fn report(&self) -> Result<()> {
+        let why = match (&self.reason, &self.msg) {
+            (Some(reason), None) => format!("{}", reason),
+            (Some(reason), Some(msg)) => format!("{} ({})", reason, msg),
+            _ => "".into(),
+        };
+
+        match self.kind {
+            0 => Ok(()),
+            etype => {
+                if etype != 64 {
+                    bail!("EXIT: kind={} {}", etype, why);
+                } else {
+                    info!("EXIT: {}", why);
+                    Ok(())
+                }
+            }
         }
     }
-    Ok(())
 }
