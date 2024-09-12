@@ -1153,7 +1153,12 @@ impl CpuPool {
     }
 }
 
-fn layer_core_order(growth_algo: LayerGrowthAlgo, layer_idx: usize, topo: &Topology) -> Vec<usize> {
+fn layer_core_order(
+    spec: &LayerSpec,
+    growth_algo: LayerGrowthAlgo,
+    layer_idx: usize,
+    topo: &Topology,
+) -> Vec<usize> {
     let mut core_order = vec![];
 
     let mut linear = || {
@@ -1214,26 +1219,24 @@ struct Layer {
 
 impl Layer {
     fn new(
+        spec: &LayerSpec,
         idx: usize,
         cpu_pool: &CpuPool,
         name: &str,
-        kind: LayerKind,
         topo: &Topology,
     ) -> Result<Self> {
+        let kind = spec.kind.clone();
         let mut cpus = bitvec![0; cpu_pool.nr_cpus];
         cpus.fill(false);
         let mut allowed_cpus = bitvec![0; cpu_pool.nr_cpus];
-        let mut layer_growth_algo = LayerGrowthAlgo::Sticky;
         match &kind {
             LayerKind::Confined {
                 cpus_range,
                 util_range,
                 nodes,
                 llcs,
-                growth_algo,
                 ..
             } => {
-                layer_growth_algo = growth_algo.clone();
                 let cpus_range = cpus_range.unwrap_or((0, std::usize::MAX));
                 if cpus_range.0 > cpus_range.1 || cpus_range.1 == 0 {
                     bail!("invalid cpus_range {:?}", cpus_range);
@@ -1281,7 +1284,6 @@ impl Layer {
                 llcs,
                 ..
             } => {
-                layer_growth_algo = growth_algo.clone();
                 if nodes.len() == 0 && llcs.len() == 0 {
                     allowed_cpus.fill(true);
                 } else {
@@ -1756,13 +1758,7 @@ impl<'a, 'b> Scheduler<'a, 'b> {
 
         let mut layers = vec![];
         for (idx, spec) in layer_specs.iter().enumerate() {
-            layers.push(Layer::new(
-                idx,
-                &cpu_pool,
-                &spec.name,
-                spec.kind.clone(),
-                &topo,
-            )?);
+            layers.push(Layer::new(&spec, idx, &cpu_pool, &spec.name, &topo)?);
         }
 
         // Other stuff.
