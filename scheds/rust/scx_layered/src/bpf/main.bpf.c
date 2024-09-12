@@ -47,9 +47,14 @@ static u32 preempt_cursor;
 #define dbg(fmt, args...)	do { if (debug) bpf_printk(fmt, ##args); } while (0)
 #define trace(fmt, args...)	do { if (debug > 1) bpf_printk(fmt, ##args); } while (0)
 
-#include "util.bpf.c"
+#include "util.bpf.h"
 
-UEI_DEFINE(uei);
+#define __COMPAT_scx_bpf_error(fmt, args...)            \
+	do {                                    \
+		bpf_printk(fmt, ##args);        \
+	} while (0)
+
+struct user_exit_info uei;
 
 static inline bool vtime_before(u64 a, u64 b)
 {
@@ -113,7 +118,7 @@ static u32 dsq_iter_rr_cpu_ctx(u32 layer_idx, int idx)
 		offset -= nr_layers;
 
 	if (offset > MAX_LAYERS) {
-		scx_bpf_error("invalid layer id %u", layer_idx);
+		__COMPAT_scx_bpf_error("invalid layer id %u", layer_idx);
 		return 0;
 	}
 	return offset;
@@ -136,7 +141,7 @@ static __noinline u32 iter_layer_dsq_ctx(int idx, u32 layer_idx)
 		u32 ret;
 		ret = dsq_iter_weight_ctx(idx);
 		if (ret >= nr_layers) {
-			scx_bpf_error("can't happen");
+			__COMPAT_scx_bpf_error("can't happen");
 			return ret;
 		}
 		return ret;
@@ -147,7 +152,7 @@ static __noinline u32 iter_layer_dsq_ctx(int idx, u32 layer_idx)
 		return dsq_iter_weight_ctx(idx);
 	}
 	default:
-		scx_bpf_error("unknown dsq iter algo");
+		__COMPAT_scx_bpf_error("unknown dsq iter algo");
 		return 0;
 	}
 }
@@ -164,7 +169,7 @@ static __noinline u32 cpu_to_llc_id(s32 cpu_id)
 
         llc_ptr = MEMBER_VPTR(cpu_llc_id_map, [cpu_id]);
         if (!llc_ptr) {
-                scx_bpf_error("Couldn't look up llc ID for cpu %d", cpu_id);
+                __COMPAT_scx_bpf_error("Couldn't look up llc ID for cpu %d", cpu_id);
                 return 0;
         }
         return *llc_ptr;
@@ -176,7 +181,7 @@ u32 llc_node_id(u32 llc_id)
 
         llc_ptr = MEMBER_VPTR(llc_numa_id_map, [llc_id]);
         if (!llc_ptr) {
-                scx_bpf_error("Couldn't look up llc ID for %d", llc_id);
+                __COMPAT_scx_bpf_error("Couldn't look up llc ID for %d", llc_id);
                 return 0;
         }
         return *llc_ptr;
@@ -232,13 +237,28 @@ static struct cpu_ctx *lookup_cpu_ctx(int cpu)
 		cctx = bpf_map_lookup_percpu_elem(&cpu_ctxs, &zero, cpu);
 
 	if (!cctx) {
-		scx_bpf_error("no cpu_ctx for cpu %d", cpu);
+		__COMPAT_scx_bpf_error("no cpu_ctx for cpu %d", cpu);
 		return NULL;
 	}
 
 	return cctx;
 }
 
+static u32 cpu_to_llc_id(s32 cpu_id)
+{
+        const volatile u32 *llc_ptr;
+
+        llc_ptr = MEMBER_VPTR(cpu_llc_id_map, [cpu_id]);
+        if (!llc_ptr) {
+                __COMPAT_scx_bpf_error("Couldn't look up llc ID for cpu %d", cpu_id);
+                return 0;
+        }
+        return *llc_ptr;
+}
+
+/*
+ * Numa node context
+ */
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
 	__type(key, u32);
@@ -274,7 +294,7 @@ static struct cache_ctx *lookup_cache_ctx(u32 cache_idx)
 static void gstat_inc(enum global_stat_idx idx, struct cpu_ctx *cctx)
 {
 	if (idx < 0 || idx >= NR_GSTATS) {
-		scx_bpf_error("invalid global stat idx %d", idx);
+		__COMPAT_scx_bpf_error("invalid global stat idx %d", idx);
 		return;
 	}
 
@@ -289,7 +309,7 @@ static void lstat_add(enum layer_stat_idx idx, struct layer *layer,
 	if ((vptr = MEMBER_VPTR(*cctx, .lstats[layer->idx][idx])))
 		(*vptr) += delta;
 	else
-		scx_bpf_error("invalid layer or stat idxs: %d, %d", idx, layer->idx);
+		__COMPAT_scx_bpf_error("invalid layer or stat idxs: %d, %d", idx, layer->idx);
 }
 
 static void lstat_inc(enum layer_stat_idx idx, struct layer *layer,
@@ -319,7 +339,7 @@ static void adj_load(u32 layer_idx, s64 adj, u64 now)
 	lockw = bpf_map_lookup_elem(&layer_load_locks, &layer_idx);
 
 	if (!layer || !lockw) {
-		scx_bpf_error("Can't access layer%d or its load_lock", layer_idx);
+		__COMPAT_scx_bpf_error("Can't access layer%d or its load_lock", layer_idx);
 		return;
 	}
 
@@ -329,7 +349,7 @@ static void adj_load(u32 layer_idx, s64 adj, u64 now)
 	bpf_spin_unlock(&lockw->lock);
 
 	if (debug && adj < 0 && (s64)layer->load < 0)
-		scx_bpf_error("cpu%d layer%d load underflow (load=%lld adj=%lld)",
+		__COMPAT_scx_bpf_error("cpu%d layer%d load underflow (load=%lld adj=%lld)",
 			      bpf_get_smp_processor_id(), layer_idx, layer->load, adj);
 }
 
@@ -352,7 +372,7 @@ static struct cpumask *lookup_layer_cpumask(int idx)
 	if ((cpumaskw = bpf_map_lookup_elem(&layer_cpumasks, &idx))) {
 		return (struct cpumask *)cpumaskw->cpumask;
 	} else {
-		scx_bpf_error("no layer_cpumask");
+		__COMPAT_scx_bpf_error("no layer_cpumask");
 		return NULL;
 	}
 }
@@ -373,7 +393,7 @@ static void refresh_cpumasks(int idx)
 		u8 *u8_ptr;
 
 		if (!(cctx = lookup_cpu_ctx(cpu))) {
-			scx_bpf_error("unknown cpu");
+			__COMPAT_scx_bpf_error("unknown cpu");
 			return;
 		}
 
@@ -385,7 +405,7 @@ static void refresh_cpumasks(int idx)
 			 */
 			barrier_var(cpumaskw);
 			if (!cpumaskw || !cpumaskw->cpumask) {
-				scx_bpf_error("can't happen");
+				__COMPAT_scx_bpf_error("can't happen");
 				return;
 			}
 
@@ -396,20 +416,32 @@ static void refresh_cpumasks(int idx)
 				bpf_cpumask_clear_cpu(cpu, cpumaskw->cpumask);
 			}
 		} else {
-			scx_bpf_error("can't happen");
+			__COMPAT_scx_bpf_error("can't happen");
 		}
 	}
 
 	// XXX - shouldn't be necessary
 	layer = MEMBER_VPTR(layers, [idx]);
 	if (!layer) {
-		scx_bpf_error("can't happen");
+		__COMPAT_scx_bpf_error("can't happen");
 		return;
 	}
 
 	layer->nr_cpus = total;
 	__sync_fetch_and_add(&layer->cpus_seq, 1);
 	trace("LAYER[%d] now has %d cpus, seq=%llu", idx, layer->nr_cpus, layer->cpus_seq);
+}
+
+u32 llc_node_id(u32 llc_id)
+{
+        const volatile u32 *llc_ptr;
+
+        llc_ptr = MEMBER_VPTR(llc_numa_id_map, [llc_id]);
+        if (!llc_ptr) {
+                __COMPAT_scx_bpf_error("Couldn't look up llc ID for %d", llc_id);
+                return 0;
+        }
+        return *llc_ptr;
 }
 
 SEC("fentry")
@@ -433,6 +465,7 @@ struct task_ctx {
 	struct bpf_cpumask __kptr *layered_cpumask;
 
 	bool			all_cpus_allowed;
+	bool			dispatch_local;
 	u64			runnable_at;
 	u64			running_at;
 };
@@ -454,7 +487,7 @@ static struct task_ctx *lookup_task_ctx(struct task_struct *p)
 	struct task_ctx *tctx = lookup_task_ctx_may_fail(p);
 
 	if (!tctx)
-		scx_bpf_error("task_ctx lookup failed");
+		__COMPAT_scx_bpf_error("task_ctx lookup failed");
 
 	return tctx;
 }
@@ -462,7 +495,7 @@ static struct task_ctx *lookup_task_ctx(struct task_struct *p)
 static struct layer *lookup_layer(int idx)
 {
 	if (idx < 0 || idx >= nr_layers) {
-		scx_bpf_error("invalid layer %d", idx);
+		__COMPAT_scx_bpf_error("invalid layer %d", idx);
 		return NULL;
 	}
 	return &layers[idx];
@@ -495,7 +528,7 @@ int BPF_PROG(tp_cgroup_attach_task, struct cgroup *cgrp, const char *cgrp_path,
 	thread_head = &leader->signal->thread_head;
 
 	if (!(next = bpf_task_acquire(leader))) {
-		scx_bpf_error("failed to acquire leader");
+		__COMPAT_scx_bpf_error("failed to acquire leader");
 		return 0;
 	}
 
@@ -808,9 +841,8 @@ s32 BPF_STRUCT_OPS(layered_select_cpu, struct task_struct *p, s32 prev_cpu, u64 
 	cpu = pick_idle_cpu(p, prev_cpu, cctx, tctx, layer, true);
 
 	if (cpu >= 0) {
-		lstat_inc(LSTAT_SEL_LOCAL, layer, cctx);
 		u64 layer_slice_ns = layer->slice_ns > 0 ? layer->slice_ns : slice_ns;
-		scx_bpf_dispatch(p, SCX_DSQ_LOCAL, layer_slice_ns, 0);
+		tctx->dispatch_local = true;
 		return cpu;
 	} else {
 		return prev_cpu;
@@ -828,7 +860,7 @@ bool pick_idle_cpu_and_kick(struct task_struct *p, s32 task_cpu,
 
 	if (cpu >= 0) {
 		lstat_inc(LSTAT_KICK, layer, cctx);
-		scx_bpf_kick_cpu(cpu, SCX_KICK_IDLE);
+		scx_bpf_kick_cpu(cpu, 0 /*SCX_KICK_IDLE*/);
 		return true;
 	} else {
 		return false;
@@ -1052,6 +1084,13 @@ void BPF_STRUCT_OPS(layered_enqueue, struct task_struct *p, u64 enq_flags)
 	    !(layer = lookup_layer(tctx->layer)))
 		return;
 
+	if (tctx->dispatch_local) {
+		tctx->dispatch_local = false;
+		lstat_inc(LSTAT_SEL_LOCAL, layer, cctx);
+		scx_bpf_dispatch(p, SCX_DSQ_LOCAL, slice_ns, enq_flags);
+		return;
+	}
+
 	try_preempt_first = cctx->try_preempt_first;
 	cctx->try_preempt_first = false;
 	u64 layer_slice_ns = layer->slice_ns > 0 ? layer->slice_ns : slice_ns;
@@ -1272,7 +1311,7 @@ void layered_dispatch_no_topo(s32 cpu, struct task_struct *prev)
 	bpf_for(idx, 0, nr_layers) {
 		layer_idx = iter_layer_dsq_ctx(idx, cctx->layer_idx);
 		if (layer_idx >= nr_layers) {
-			scx_bpf_error("can't happen");
+			__COMPAT_scx_bpf_error("can't happen");
 			return;
 		}
 		layer = MEMBER_VPTR(layers, [layer_idx]);
@@ -1288,7 +1327,7 @@ void layered_dispatch_no_topo(s32 cpu, struct task_struct *prev)
 	bpf_for(idx, 0, nr_layers) {
 		layer_idx = iter_layer_dsq_ctx(idx, cctx->layer_idx);
 		if (layer_idx >= nr_layers) {
-			scx_bpf_error("can't happen");
+			__COMPAT_scx_bpf_error("can't happen");
 			return;
 		}
 		layer = MEMBER_VPTR(layers, [layer_idx]);
@@ -1309,7 +1348,7 @@ void layered_dispatch_no_topo(s32 cpu, struct task_struct *prev)
 	bpf_for(idx, 0, nr_layers) {
 		layer_idx = iter_layer_dsq_ctx(idx, cctx->layer_idx);
 		if (layer_idx >= nr_layers) {
-			scx_bpf_error("can't happen");
+			__COMPAT_scx_bpf_error("can't happen");
 			return;
 		}
 		layer = MEMBER_VPTR(layers, [layer_idx]);
@@ -1372,7 +1411,7 @@ void BPF_STRUCT_OPS(layered_dispatch, s32 cpu, struct task_struct *prev)
 	bpf_for(idx, 0, nr_layers) {
 		layer_idx = iter_layer_dsq_ctx(idx, cctx->layer_idx);
 		if (layer_idx >= nr_layers) {
-			scx_bpf_error("can't happen");
+			__COMPAT_scx_bpf_error("can't happen");
 			return;
 		}
 		layer = MEMBER_VPTR(layers, [layer_idx]);
@@ -1392,7 +1431,7 @@ void BPF_STRUCT_OPS(layered_dispatch, s32 cpu, struct task_struct *prev)
 	bpf_for(idx, 0, nr_layers) {
 		layer_idx = iter_layer_dsq_ctx(idx, cctx->layer_idx);
 		if (layer_idx >= nr_layers) {
-			scx_bpf_error("can't happen");
+			__COMPAT_scx_bpf_error("can't happen");
 			return;
 		}
 		layer = MEMBER_VPTR(layers, [layer_idx]);
@@ -1418,7 +1457,7 @@ void BPF_STRUCT_OPS(layered_dispatch, s32 cpu, struct task_struct *prev)
 	bpf_for(idx, 0, nr_layers) {
 		layer_idx = iter_layer_dsq_ctx(idx, cctx->layer_idx);
 		if (layer_idx >= nr_layers) {
-			scx_bpf_error("can't happen");
+			__COMPAT_scx_bpf_error("can't happen");
 			return;
 		}
 		layer = MEMBER_VPTR(layers, [layer_idx]);
@@ -1482,7 +1521,7 @@ static __noinline bool match_one(struct layer_match *match,
 	case MATCH_TGID_EQUALS:
 		return p->tgid == match->tgid;
 	default:
-		scx_bpf_error("invalid match kind %d", match->kind);
+		__COMPAT_scx_bpf_error("invalid match kind %d", match->kind);
 		return result;
 	}
 }
@@ -1591,7 +1630,7 @@ static void maybe_refresh_layer(struct task_struct *p, struct task_ctx *tctx)
 		 */
 		p->scx.dsq_vtime = layer->vtime_now;
 	} else {
-		scx_bpf_error("[%s]%d didn't match any layer", p->comm, p->pid);
+		__COMPAT_scx_bpf_error("[%s]%d didn't match any layer", p->comm, p->pid);
 	}
 
 	if (tctx->layer < nr_layers - 1)
@@ -1605,13 +1644,13 @@ static s32 create_save_cpumask(struct bpf_cpumask **kptr)
 
 	cpumask = bpf_cpumask_create();
 	if (!cpumask) {
-		scx_bpf_error("Failed to create cpumask");
+		__COMPAT_scx_bpf_error("Failed to create cpumask");
 		return -ENOMEM;
 	}
 
 	cpumask = bpf_kptr_xchg(kptr, cpumask);
 	if (cpumask) {
-		scx_bpf_error("kptr already had cpumask");
+		__COMPAT_scx_bpf_error("kptr already had cpumask");
 		bpf_cpumask_release(cpumask);
 	}
 
@@ -1629,7 +1668,7 @@ static s32 create_node(u32 node_id)
 	nodec = bpf_map_lookup_elem(&node_data, &node_id);
 	if (!nodec) {
 		/* Should never happen, it's created statically at load time. */
-		scx_bpf_error("No node%u", node_id);
+		__COMPAT_scx_bpf_error("No node%u", node_id);
 		return -ENOENT;
 	}
 	nodec->id = node_id;
@@ -1642,7 +1681,7 @@ static s32 create_node(u32 node_id)
 	cpumask = nodec->cpumask;
 	if (!cpumask) {
 		bpf_rcu_read_unlock();
-		scx_bpf_error("Failed to lookup node cpumask");
+		__COMPAT_scx_bpf_error("Failed to lookup node cpumask");
 		return -ENOENT;
 	}
 
@@ -1651,7 +1690,7 @@ static s32 create_node(u32 node_id)
 
 		nmask = MEMBER_VPTR(numa_cpumasks, [node_id][cpu / 64]);
 		if (!nmask) {
-			scx_bpf_error("array index error");
+			__COMPAT_scx_bpf_error("array index error");
 			ret = -ENOENT;
 			break;
 		}
@@ -1659,7 +1698,7 @@ static s32 create_node(u32 node_id)
 		if (*nmask & (1LLU << (cpu % 64))) {
 			bpf_cpumask_set_cpu(cpu, cpumask);
 			if (!(cctx = lookup_cpu_ctx(cpu))) {
-				scx_bpf_error("cpu ctx error");
+				__COMPAT_scx_bpf_error("cpu ctx error");
 				ret = -ENOENT;
 				break;
 			}
@@ -1685,7 +1724,7 @@ static s32 create_cache(u32 cache_id)
 
 	cachec = bpf_map_lookup_elem(&cache_data, &cache_id);
 	if (!cachec) {
-		scx_bpf_error("No cache%u", cache_id);
+		__COMPAT_scx_bpf_error("No cache%u", cache_id);
 		return -ENOENT;
 	}
 	cachec->id = cache_id;
@@ -1698,14 +1737,14 @@ static s32 create_cache(u32 cache_id)
 	cpumask = cachec->cpumask;
 	if (!cpumask) {
 		bpf_rcu_read_unlock();
-		scx_bpf_error("Failed to lookup node cpumask");
+		__COMPAT_scx_bpf_error("Failed to lookup node cpumask");
 		return -ENOENT;
 	}
 
 	bpf_for(cpu, 0, nr_possible_cpus) {
 		if (!(cctx = lookup_cpu_ctx(cpu))) {
 			bpf_rcu_read_unlock();
-			scx_bpf_error("cpu ctx error");
+			__COMPAT_scx_bpf_error("cpu ctx error");
 			return -ENOENT;
 		}
 
@@ -1823,7 +1862,7 @@ void BPF_STRUCT_OPS(layered_running, struct task_struct *p)
 	}
 
 	if (layer->perf > 0)
-		scx_bpf_cpuperf_set(task_cpu, layer->perf);
+		__COMPAT_scx_bpf_cpuperf_set(task_cpu, layer->perf);
 
 	cctx->maybe_idle = false;
 }
@@ -1918,7 +1957,7 @@ void BPF_STRUCT_OPS(layered_set_cpumask, struct task_struct *p,
 		return;
 
 	if (!all_cpumask) {
-		scx_bpf_error("NULL all_cpumask");
+		__COMPAT_scx_bpf_error("NULL all_cpumask");
 		return;
 	}
 
@@ -1932,8 +1971,7 @@ void BPF_STRUCT_OPS(layered_cpu_release, s32 cpu,
 	scx_bpf_reenqueue_local();
 }
 
-s32 BPF_STRUCT_OPS(layered_init_task, struct task_struct *p,
-		   struct scx_init_task_args *args)
+s32 BPF_STRUCT_OPS(layered_prep_enable, struct task_struct *p, struct scx_enable_args *args)
 {
 	struct task_ctx *tctx;
 	struct bpf_cpumask *cpumask;
@@ -1946,7 +1984,7 @@ s32 BPF_STRUCT_OPS(layered_init_task, struct task_struct *p,
 	tctx = bpf_task_storage_get(&task_ctxs, p, 0,
 				    BPF_LOCAL_STORAGE_GET_F_CREATE);
 	if (!tctx) {
-		scx_bpf_error("task_ctx allocation failure");
+		__COMPAT_scx_bpf_error("task_ctx allocation failure");
 		return -ENOMEM;
 	}
 
@@ -1970,7 +2008,7 @@ s32 BPF_STRUCT_OPS(layered_init_task, struct task_struct *p,
 		tctx->all_cpus_allowed =
 			bpf_cpumask_subset((const struct cpumask *)all_cpumask, p->cpus_ptr);
 	else
-		scx_bpf_error("missing all_cpumask");
+		__COMPAT_scx_bpf_error("missing all_cpumask");
 
 	/*
 	 * We are matching cgroup hierarchy path directly rather than the CPU
@@ -1982,8 +2020,7 @@ s32 BPF_STRUCT_OPS(layered_init_task, struct task_struct *p,
 	return 0;
 }
 
-void BPF_STRUCT_OPS(layered_exit_task, struct task_struct *p,
-		    struct scx_exit_task_args *args)
+void BPF_STRUCT_OPS(layered_disable, struct task_struct *p)
 {
 	struct cpu_ctx *cctx;
 	struct task_ctx *tctx;
@@ -1995,49 +2032,50 @@ void BPF_STRUCT_OPS(layered_exit_task, struct task_struct *p,
 		__sync_fetch_and_add(&layers[tctx->layer].nr_tasks, -1);
 }
 
-static u64 dsq_first_runnable_for_ms(u64 dsq_id, u64 now)
-{
-	struct task_struct *p;
+// static u64 dsq_first_runnable_for_ms(u64 dsq_id, u64 now)
+// {
+// 	struct task_struct *p;
+// 
+// 	if (dsq_id > LO_FALLBACK_DSQ)
+// 		return 0;
+// 
+// 	bpf_for_each(scx_dsq, p, dsq_id, 0) {
+// 		struct task_ctx *tctx;
+// 
+// 		if ((tctx = lookup_task_ctx(p)))
+// 			return (now - tctx->runnable_at) / 1000000;
+// 	}
+// 
+// 	return 0;
+// }
 
-	if (dsq_id > LO_FALLBACK_DSQ)
-		return 0;
-
-	bpf_for_each(scx_dsq, p, dsq_id, 0) {
-		struct task_ctx *tctx;
-
-		if ((tctx = lookup_task_ctx(p)))
-			return (now - tctx->runnable_at) / 1000000;
-	}
-
-	return 0;
-}
 
 static void dump_layer_cpumask(int idx)
 {
-	struct cpumask *layer_cpumask;
-	s32 cpu;
-	char buf[128] = "", *p;
-
-	if (!(layer_cpumask = lookup_layer_cpumask(idx)))
-		return;
-
-	bpf_for(cpu, 0, scx_bpf_nr_cpu_ids()) {
-		if (!(p = MEMBER_VPTR(buf, [idx++])))
-			break;
-		if (bpf_cpumask_test_cpu(cpu, layer_cpumask))
-			*p++ = '0' + cpu % 10;
-		else
-			*p++ = '.';
-
-		if ((cpu & 7) == 7) {
-			if (!(p = MEMBER_VPTR(buf, [idx++])))
-				break;
-			*p++ = '|';
-		}
-	}
-	buf[sizeof(buf) - 1] = '\0';
-
-	scx_bpf_dump("%s", buf);
+	/* struct cpumask *layer_cpumask; */
+	/* s32 cpu; */
+	/* char buf[128] = "", *p; */
+	/**/
+	/* if (!(layer_cpumask = lookup_layer_cpumask(idx))) */
+	/* 	return; */
+	/**/
+	/* bpf_for(cpu, 0, scx_bpf_nr_cpu_ids()) { */
+	/* 	if (!(p = MEMBER_VPTR(buf, [idx++]))) */
+	/* 		break; */
+	/* 	if (bpf_cpumask_test_cpu(cpu, layer_cpumask)) */
+	/* 		*p++ = '0' + cpu % 10; */
+	/* 	else */
+	/* 		*p++ = '.'; */
+	/**/
+	/* 	if ((cpu & 7) == 7) { */
+	/* 		if (!(p = MEMBER_VPTR(buf, [idx++]))) */
+	/* 			break; */
+	/* 		*p++ = '|'; */
+	/* 	} */
+	/* } */
+	/* buf[sizeof(buf) - 1] = '\0'; */
+	/**/
+	/* scx_bpf_dump("%s", buf); */
 }
 
 void BPF_STRUCT_OPS(layered_dump, struct scx_dump_ctx *dctx)
@@ -2047,42 +2085,177 @@ void BPF_STRUCT_OPS(layered_dump, struct scx_dump_ctx *dctx)
 	int i, j, idx;
 	struct layer *layer;
 
-	bpf_for(i, 0, nr_layers) {
-		layer = lookup_layer(i);
-		if (!layer) {
-			scx_bpf_error("unabled to lookup layer %d", i);
-			continue;
-		}
-
-		if (disable_topology) {
-			scx_bpf_dump("LAYER[%d] nr_cpus=%u nr_queued=%d -%llums cpus=",
-				     i, layers[i].nr_cpus, scx_bpf_dsq_nr_queued(i),
-				     dsq_first_runnable_for_ms(i, now));
-		} else {
-			bpf_for(j, 0, nr_llcs) {
-				if (!(layer->cache_mask & (1 << j)))
-					continue;
-
-				idx = layer_dsq_id(layer->idx, j);
-				scx_bpf_dump("LAYER[%d]DSQ[%d] nr_cpus=%u nr_queued=%d -%llums cpus=",
-					     i, idx, layers[i].nr_cpus, scx_bpf_dsq_nr_queued(idx),
-					     dsq_first_runnable_for_ms(idx, now));
-				scx_bpf_dump("\n");
-			}
-		}
-		dump_layer_cpumask(i);
-		scx_bpf_dump("\n");
-	}
-	bpf_for(i, 0, nr_llcs) {
-		dsq_id = llc_hi_fallback_dsq_id(i);
-		scx_bpf_dump("HI_FALLBACK[%llu] nr_queued=%d -%llums\n",
-			     dsq_id, scx_bpf_dsq_nr_queued(dsq_id),
-			     dsq_first_runnable_for_ms(dsq_id, now));
-	}
-	scx_bpf_dump("LO_FALLBACK nr_queued=%d -%llums\n",
-		     scx_bpf_dsq_nr_queued(LO_FALLBACK_DSQ),
-		     dsq_first_runnable_for_ms(LO_FALLBACK_DSQ, now));
+	/* bpf_for(i, 0, nr_layers) { */
+	/* 	layer = lookup_layer(i); */
+	/* 	if (!layer) { */
+	/* 		__COMPAT_scx_bpf_error("unabled to lookup layer %d", i); */
+	/* 		continue; */
+	/* 	} */
+	/**/
+	/* 	if (disable_topology) { */
+	/* 		scx_bpf_dump("LAYER[%d] nr_cpus=%u nr_queued=%d -%llums cpus=", */
+	/* 			     i, layers[i].nr_cpus, scx_bpf_dsq_nr_queued(i), */
+	/* 			     dsq_first_runnable_for_ms(i, now)); */
+	/* 	} else { */
+	/* 		bpf_for(j, 0, nr_llcs) { */
+	/* 			if (!(layer->cache_mask & (1 << j))) */
+	/* 				continue; */
+	/**/
+	/* 			idx = layer_dsq_id(layer->idx, j); */
+	/* 			scx_bpf_dump("LAYER[%d]DSQ[%d] nr_cpus=%u nr_queued=%d -%llums cpus=", */
+	/* 				     i, idx, layers[i].nr_cpus, scx_bpf_dsq_nr_queued(idx), */
+	/* 				     dsq_first_runnable_for_ms(idx, now)); */
+	/* 			scx_bpf_dump("\n"); */
+	/* 		} */
+	/* 	} */
+	/* 	dump_layer_cpumask(i); */
+	/* 	scx_bpf_dump("\n"); */
+	/* } */
+	/* bpf_for(i, 0, nr_llcs) { */
+	/* 	dsq_id = llc_hi_fallback_dsq_id(i); */
+	/* 	scx_bpf_dump("HI_FALLBACK[%llu] nr_queued=%d -%llums\n", */
+	/* 		     dsq_id, scx_bpf_dsq_nr_queued(dsq_id), */
+	/* 		     dsq_first_runnable_for_ms(dsq_id, now)); */
+	/* } */
+	/* scx_bpf_dump("LO_FALLBACK nr_queued=%d -%llums\n", */
+	/* 	     scx_bpf_dsq_nr_queued(LO_FALLBACK_DSQ), */
+	/* 	     dsq_first_runnable_for_ms(LO_FALLBACK_DSQ, now)); */
 }
+
+static void dump_layer_cpumask(int idx)
+{
+	/* struct cpumask *layer_cpumask; */
+	/* s32 cpu; */
+	/* char buf[128] = "", *p; */
+	/**/
+	/* if (!(layer_cpumask = lookup_layer_cpumask(idx))) */
+	/* 	return; */
+	/**/
+	/* bpf_for(cpu, 0, scx_bpf_nr_cpu_ids()) { */
+	/* 	if (!(p = MEMBER_VPTR(buf, [idx++]))) */
+	/* 		break; */
+	/* 	if (bpf_cpumask_test_cpu(cpu, layer_cpumask)) */
+	/* 		*p++ = '0' + cpu % 10; */
+	/* 	else */
+	/* 		*p++ = '.'; */
+	/**/
+	/* 	if ((cpu & 7) == 7) { */
+	/* 		if (!(p = MEMBER_VPTR(buf, [idx++]))) */
+	/* 			break; */
+	/* 		*p++ = '|'; */
+	/* 	} */
+	/* } */
+	/* buf[sizeof(buf) - 1] = '\0'; */
+	/**/
+	/* scx_bpf_dump("%s", buf); */
+}
+
+/* void BPF_STRUCT_OPS(layered_dump, struct scx_dump_ctx *dctx) */
+/* { */
+/* 	u64 now = bpf_ktime_get_ns(); */
+/* 	int i, j, idx; */
+/* 	struct layer *layer; */
+/**/
+/* 	bpf_for(i, 0, nr_layers) { */
+/* 		layer = lookup_layer(i); */
+/* 		if (!layer) { */
+/* 			__COMPAT_scx_bpf_error("unabled to lookup layer %d", i); */
+/* 			continue; */
+/* 		} */
+/**/
+/* 		if (disable_topology) { */
+/* 			scx_bpf_dump("LAYER[%d] nr_cpus=%u nr_queued=%d -%llums cpus=", */
+/* 				     i, layers[i].nr_cpus, scx_bpf_dsq_nr_queued(i), */
+/* 				     dsq_first_runnable_for_ms(i, now)); */
+/* 		} else { */
+/* 			bpf_for(j, 0, nr_llcs) { */
+/* 				if (!(layer->cache_mask & (1 << j))) */
+/* 					continue; */
+/**/
+/* 				idx = layer_dsq_id(layer->idx, j); */
+/* 				scx_bpf_dump("LAYER[%d]DSQ[%d] nr_cpus=%u nr_queued=%d -%llums cpus=", */
+/* 					     i, idx, layers[i].nr_cpus, scx_bpf_dsq_nr_queued(idx), */
+/* 					     dsq_first_runnable_for_ms(idx, now)); */
+/* 			} */
+/* 		} */
+/* 		dump_layer_cpumask(i); */
+/* 		scx_bpf_dump("\n"); */
+/* 	} */
+/**/
+/* 	scx_bpf_dump("HI_FALLBACK nr_queued=%d -%llums\n", */
+/* 		     scx_bpf_dsq_nr_queued(HI_FALLBACK_DSQ), */
+/* 		     dsq_first_runnable_for_ms(HI_FALLBACK_DSQ, now)); */
+/* 	scx_bpf_dump("LO_FALLBACK nr_queued=%d -%llums\n", */
+/* 		     scx_bpf_dsq_nr_queued(LO_FALLBACK_DSQ), */
+/* 		     dsq_first_runnable_for_ms(LO_FALLBACK_DSQ, now)); */
+/* } */
+// static void dump_layer_cpumask(int idx)
+// {
+// 	struct cpumask *layer_cpumask;
+// 	s32 cpu;
+// 	char buf[128] = "", *p;
+// 
+// 	if (!(layer_cpumask = lookup_layer_cpumask(idx)))
+// 		return;
+// 
+// 	bpf_for(cpu, 0, scx_bpf_nr_cpu_ids()) {
+// 		if (!(p = MEMBER_VPTR(buf, [idx++])))
+// 			break;
+// 		if (bpf_cpumask_test_cpu(cpu, layer_cpumask))
+// 			*p++ = '0' + cpu % 10;
+// 		else
+// 			*p++ = '.';
+// 
+// 		if ((cpu & 7) == 7) {
+// 			if (!(p = MEMBER_VPTR(buf, [idx++])))
+// 				break;
+// 			*p++ = '|';
+// 		}
+// 	}
+// 	buf[sizeof(buf) - 1] = '\0';
+// 
+// 	scx_bpf_dump("%s", buf);
+// }
+// 
+// void BPF_STRUCT_OPS(layered_dump, struct scx_dump_ctx *dctx)
+// {
+// 	u64 now = bpf_ktime_get_ns();
+// 	int i, j, idx;
+// 	struct layer *layer;
+// 
+// 	bpf_for(i, 0, nr_layers) {
+// 		layer = lookup_layer(i);
+// 		if (!layer) {
+// 			__COMPAT_scx_bpf_error("unabled to lookup layer %d", i);
+// 			continue;
+// 		}
+// 
+// 		if (disable_topology) {
+// 			scx_bpf_dump("LAYER[%d] nr_cpus=%u nr_queued=%d -%llums cpus=",
+// 				     i, layers[i].nr_cpus, scx_bpf_dsq_nr_queued(i),
+// 				     dsq_first_runnable_for_ms(i, now));
+// 		} else {
+// 			bpf_for(j, 0, nr_llcs) {
+// 				if (!(layer->cache_mask & (1 << j)))
+// 					continue;
+// 
+// 				idx = layer_dsq_id(layer->idx, j);
+// 				scx_bpf_dump("LAYER[%d]DSQ[%d] nr_cpus=%u nr_queued=%d -%llums cpus=",
+// 					     i, idx, layers[i].nr_cpus, scx_bpf_dsq_nr_queued(idx),
+// 					     dsq_first_runnable_for_ms(idx, now));
+// 			}
+// 		}
+// 		dump_layer_cpumask(i);
+// 		scx_bpf_dump("\n");
+// 	}
+// 
+// 	scx_bpf_dump("HI_FALLBACK nr_queued=%d -%llums\n",
+// 		     scx_bpf_dsq_nr_queued(HI_FALLBACK_DSQ),
+// 		     dsq_first_runnable_for_ms(HI_FALLBACK_DSQ, now));
+// 	scx_bpf_dump("LO_FALLBACK nr_queued=%d -%llums\n",
+// 		     scx_bpf_dsq_nr_queued(LO_FALLBACK_DSQ),
+// 		     dsq_first_runnable_for_ms(LO_FALLBACK_DSQ, now));
+// }
 
 static void print_iter_order() {
 	struct cpu_ctx *cctx;
@@ -2090,7 +2263,7 @@ static void print_iter_order() {
 	u32 layer_idx;
 
 	if (!(cctx = lookup_cpu_ctx(-1))) {
-		scx_bpf_error("failed to get cpu ctx");
+		__COMPAT_scx_bpf_error("failed to get cpu ctx");
 		return;
 	}
 
@@ -2107,7 +2280,9 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(layered_init)
 	struct cpu_ctx *cctx;
 	int i, j, k, nr_online_cpus, ret;
 
-	ret = scx_bpf_create_dsq(LO_FALLBACK_DSQ, -1);
+	__COMPAT_scx_bpf_switch_all();
+
+	ret = scx_bpf_create_dsq(HI_FALLBACK_DSQ, -1);
 	if (ret < 0)
 		return ret;
 
@@ -2176,19 +2351,19 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(layered_init)
 		    layer->exclusive);
 
 		if (layer->nr_match_ors > MAX_LAYER_MATCH_ORS) {
-			scx_bpf_error("too many ORs");
+			__COMPAT_scx_bpf_error("too many ORs");
 			return -EINVAL;
 		}
 
 		bpf_for(j, 0, layer->nr_match_ors) {
 			struct layer_match_ands *ands = MEMBER_VPTR(layers, [i].matches[j]);
 			if (!ands) {
-				scx_bpf_error("shouldn't happen");
+				__COMPAT_scx_bpf_error("shouldn't happen");
 				return -EINVAL;
 			}
 
 			if (ands->nr_match_ands > NR_LAYER_MATCH_KINDS) {
-				scx_bpf_error("too many ANDs");
+				__COMPAT_scx_bpf_error("too many ANDs");
 				return -EINVAL;
 			}
 
@@ -2204,7 +2379,7 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(layered_init)
 
 				match = MEMBER_VPTR(layers, [i].matches[j].matches[k]);
 				if (!match) {
-					scx_bpf_error("shouldn't happen");
+					__COMPAT_scx_bpf_error("shouldn't happen");
 					return -EINVAL;
 				}
 
@@ -2243,7 +2418,7 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(layered_init)
 					dbg("%s TGID %u", header, match->tgid);
 					break;
 				default:
-					scx_bpf_error("%s Invalid kind", header);
+					__COMPAT_scx_bpf_error("%s Invalid kind", header);
 					return -EINVAL;
 				}
 			}
@@ -2301,7 +2476,7 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(layered_init)
 
 void BPF_STRUCT_OPS(layered_exit, struct scx_exit_info *ei)
 {
-	UEI_RECORD(uei, ei);
+	uei_record(&uei, ei);
 }
 
 SCX_OPS_DEFINE(layered,
@@ -2316,9 +2491,11 @@ SCX_OPS_DEFINE(layered,
 	       .set_weight		= (void *)layered_set_weight,
 	       .set_cpumask		= (void *)layered_set_cpumask,
 	       .cpu_release		= (void *)layered_cpu_release,
-	       .init_task		= (void *)layered_init_task,
-	       .exit_task		= (void *)layered_exit_task,
-	       .dump			= (void *)layered_dump,
+	       .prep_enable		= (void *)layered_prep_enable,
+	       .disable 		= (void *)layered_disable,
+	       // .dump			= (void *)layered_dump,
 	       .init			= (void *)layered_init,
 	       .exit			= (void *)layered_exit,
+	       .flags			= SCX_OPS_CGROUP_KNOB_WEIGHT | SCX_OPS_ENQ_LAST,
 	       .name			= "layered");
+

@@ -8,6 +8,11 @@ mod stats;
 
 pub use bpf_skel::*;
 pub mod bpf_intf;
+use core::ffi::CStr;
+use stats::LayerStats;
+use stats::StatsReq;
+use stats::StatsRes;
+use stats::SysStats;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
@@ -47,23 +52,13 @@ use scx_stats::prelude::*;
 use scx_utils::compat;
 use scx_utils::init_libbpf_logging;
 use scx_utils::ravg::ravg_read;
-use scx_utils::scx_ops_attach;
-use scx_utils::scx_ops_load;
-use scx_utils::scx_ops_open;
-use scx_utils::uei_exited;
-use scx_utils::uei_report;
 use scx_utils::Cache;
 use scx_utils::Core;
 use scx_utils::CoreType;
 use scx_utils::LoadAggregator;
 use scx_utils::Topology;
-use scx_utils::UserExitInfo;
 use serde::Deserialize;
 use serde::Serialize;
-use stats::LayerStats;
-use stats::StatsReq;
-use stats::StatsRes;
-use stats::SysStats;
 
 const RAVG_FRAC_BITS: u32 = bpf_intf::ravg_consts_RAVG_FRAC_BITS;
 const MAX_CPUS: usize = bpf_intf::consts_MAX_CPUS as usize;
@@ -461,6 +456,12 @@ struct Opts {
     /// is not launched.
     #[clap(long)]
     monitor: Option<f64>,
+
+    /// DEPRECATED: Enable output of stats in OpenMetrics format instead of via
+    /// log macros.  This option is useful if you want to collect stats in some
+    /// monitoring database like prometheseus.
+    #[clap(short = 'o', long)]
+    open_metrics_format: bool,
 
     /// Run with example layer specifications (useful for e.g. CI pipelines)
     #[clap(long)]
@@ -1073,6 +1074,66 @@ impl Stats {
     }
 }
 
+#[derive(Debug, Default)]
+struct UserExitInfo {
+    kind: i32,
+    reason: Option<String>,
+    msg: Option<String>,
+}
+
+impl UserExitInfo {
+    fn read(bpf_uei: &types::user_exit_info) -> Result<Self> {
+        let kind = unsafe { std::ptr::read_volatile(&bpf_uei.kind as *const _) };
+
+        let (reason, msg) = if kind != 0 {
+            (
+                Some(
+                    unsafe { CStr::from_ptr(bpf_uei.reason.as_ptr() as *const _) }
+                        .to_str()
+                        .context("Failed to convert reason to string")?
+                        .to_string(),
+                )
+                .filter(|s| !s.is_empty()),
+                Some(
+                    unsafe { CStr::from_ptr(bpf_uei.msg.as_ptr() as *const _) }
+                        .to_str()
+                        .context("Failed to convert msg to string")?
+                        .to_string(),
+                )
+                .filter(|s| !s.is_empty()),
+            )
+        } else {
+            (None, None)
+        };
+
+        Ok(Self { kind, reason, msg })
+    }
+
+    fn exited(bpf_uei: &types::user_exit_info) -> Result<bool> {
+        Ok(Self::read(bpf_uei)?.kind != 0)
+    }
+
+    fn report(&self) -> Result<()> {
+        let why = match (&self.reason, &self.msg) {
+            (Some(reason), None) => format!("{}", reason),
+            (Some(reason), Some(msg)) => format!("{} ({})", reason, msg),
+            _ => "".into(),
+        };
+
+        match self.kind {
+            0 => Ok(()),
+            etype => {
+                if etype != 64 {
+                    bail!("EXIT: kind={} {}", etype, why);
+                } else {
+                    info!("EXIT: {}", why);
+                    Ok(())
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 /// `CpuPool` represents the CPU core and logical CPU topology within the system.
 /// It manages the mapping and availability of physical and logical cores, including
@@ -1344,6 +1405,18 @@ where
     index: usize,
     iters: Vec<T>,
 }
+fn layer_core_order(growth_algo: LayerGrowthAlgo, layer_idx: usize, topo: &Topology) -> Vec<usize> {
+    let mut core_order = vec![];
+    match growth_algo {
+        LayerGrowthAlgo::Sticky => {
+            let is_left = layer_idx % 2 == 0;
+            let rot_by = |layer_idx, len| -> usize {
+                if layer_idx <= len {
+                    layer_idx
+                } else {
+                    layer_idx % len
+                }
+            };
 
 impl<T> IteratorInterleaver<T>
 where
@@ -1399,20 +1472,27 @@ struct Layer {
 }
 
 impl Layer {
-    fn new(spec: &LayerSpec, idx: usize, cpu_pool: &CpuPool, topo: &Topology) -> Result<Self> {
-        let name = &spec.name;
-        let kind = spec.kind.clone();
+    fn new(
+        idx: usize,
+        cpu_pool: &CpuPool,
+        name: &str,
+        kind: LayerKind,
+        topo: &Topology,
+    ) -> Result<Self> {
         let mut cpus = bitvec![0; cpu_pool.nr_cpus];
         cpus.fill(false);
         let mut allowed_cpus = bitvec![0; cpu_pool.nr_cpus];
+        let mut layer_growth_algo = LayerGrowthAlgo::Sticky;
         match &kind {
             LayerKind::Confined {
                 cpus_range,
                 util_range,
                 nodes,
                 llcs,
+                growth_algo,
                 ..
             } => {
+                layer_growth_algo = growth_algo.clone();
                 let cpus_range = cpus_range.unwrap_or((0, std::usize::MAX));
                 if cpus_range.0 > cpus_range.1 || cpus_range.1 == 0 {
                     bail!("invalid cpus_range {:?}", cpus_range);
@@ -1448,7 +1528,19 @@ impl Layer {
                     bail!("invalid util_range {:?}", util_range);
                 }
             }
-            LayerKind::Grouped { nodes, llcs, .. } | LayerKind::Open { nodes, llcs, .. } => {
+            LayerKind::Grouped {
+                growth_algo,
+                nodes,
+                llcs,
+                ..
+            }
+            | LayerKind::Open {
+                growth_algo,
+                nodes,
+                llcs,
+                ..
+            } => {
+                layer_growth_algo = growth_algo.clone();
                 if nodes.len() == 0 && llcs.len() == 0 {
                     allowed_cpus.fill(true);
                 } else {
@@ -1473,6 +1565,7 @@ impl Layer {
             }
         }
 
+<<<<<<< HEAD
         let layer_growth_algo = match &kind {
             LayerKind::Confined { growth_algo, .. }
             | LayerKind::Grouped { growth_algo, .. }
@@ -1491,6 +1584,13 @@ impl Layer {
             layer_growth_algo.clone(),
             core_order
         );
+        let layer_growth_algo = match &kind {
+            LayerKind::Confined { growth_algo, .. }
+            | LayerKind::Grouped { growth_algo, .. }
+            | LayerKind::Open { growth_algo, .. } => growth_algo.clone(),
+        };
+
+        let core_order = layer_core_order(layer_growth_algo, idx, topo);
 
         Ok(Self {
             name: name.into(),
@@ -1536,7 +1636,8 @@ impl Layer {
         {
             trace!(
                 "layer-{} needs more CPUs (util={:.3}) but is over the load fraction",
-                &self.name, layer_util
+                &self.name,
+                layer_util
             );
             return Ok(false);
         }
@@ -1880,7 +1981,7 @@ impl<'a, 'b> Scheduler<'a, 'b> {
         skel.maps.rodata_data.nr_llcs = 0;
 
         for node in topo.nodes() {
-            debug!(
+            info!(
                 "configuring node {}, LLCs {:?}",
                 node.id(),
                 node.llcs().len()
@@ -1897,7 +1998,7 @@ impl<'a, 'b> Scheduler<'a, 'b> {
             );
 
             for (_, llc) in node.llcs() {
-                debug!("configuring llc {:?} for node {:?}", llc.id(), node.id());
+                info!("configuring llc {:?} for node {:?}", llc.id(), node.id());
                 skel.maps.rodata_data.llc_numa_id_map[llc.id()] = node.id() as u32;
             }
         }
@@ -1920,7 +2021,9 @@ impl<'a, 'b> Scheduler<'a, 'b> {
         let mut skel_builder = BpfSkelBuilder::default();
         skel_builder.obj_builder.debug(opts.verbose > 1);
         init_libbpf_logging(None);
-        let mut skel = scx_ops_open!(skel_builder, open_object, layered)?;
+        let mut skel = skel_builder
+            .open(open_object)
+            .context("failed to open BPF program")?;
 
         // scheduler_tick() got renamed to sched_tick() during v6.10-rc.
         let sched_tick_name = match compat::ksym_exists("sched_tick")? {
@@ -1934,7 +2037,7 @@ impl<'a, 'b> Scheduler<'a, 'b> {
             .context("Failed to set attach target for sched_tick_fentry()")?;
 
         // Initialize skel according to @opts.
-        skel.struct_ops.layered_mut().exit_dump_len = opts.exit_dump_len;
+        // skel.struct_ops.layered_mut().exit_dump_len = opts.exit_dump_len;
 
         skel.maps.rodata_data.debug = opts.verbose as u32;
         skel.maps.rodata_data.slice_ns = opts.slice_us * 1000;
@@ -1958,11 +2061,17 @@ impl<'a, 'b> Scheduler<'a, 'b> {
         Self::init_layers(&mut skel, opts, layer_specs, &topo)?;
         Self::init_nodes(&mut skel, opts, &topo);
 
-        let mut skel = scx_ops_load!(skel, layered, uei)?;
+        let mut skel = skel.load().context("Failed to load BPF program")?;
 
         let mut layers = vec![];
         for (idx, spec) in layer_specs.iter().enumerate() {
-            layers.push(Layer::new(&spec, idx, &cpu_pool, &topo)?);
+            layers.push(Layer::new(
+                idx,
+                &cpu_pool,
+                &spec.name,
+                spec.kind.clone(),
+                &topo,
+            )?);
         }
         initialize_cpu_ctxs(&skel, &topo).unwrap();
 
@@ -1976,11 +2085,10 @@ impl<'a, 'b> Scheduler<'a, 'b> {
         // huge problem in the interim until we figure it out.
 
         // Attach.
-        let struct_ops = scx_ops_attach!(skel, layered)?;
         let stats_server = StatsServer::new(stats::server_data()).launch()?;
 
-        let sched = Self {
-            struct_ops: Some(struct_ops),
+        let mut sched = Self {
+            struct_ops: None,
             layer_specs,
 
             sched_intv: Duration::from_secs_f64(opts.interval),
@@ -2001,6 +2109,20 @@ impl<'a, 'b> Scheduler<'a, 'b> {
 
             stats_server,
         };
+
+        sched
+            .skel
+            .attach()
+            .context("Failed to attach BPF program")?;
+
+        sched.struct_ops = Some(
+            sched
+                .skel
+                .maps
+                .layered
+                .attach_struct_ops()
+                .context("Failed to attach layered struct ops")?,
+        );
 
         info!("Layered Scheduler Attached. Run `scx_layered --monitor` for metrics.");
 
@@ -2167,12 +2289,14 @@ impl<'a, 'b> Scheduler<'a, 'b> {
         Ok(sys_stats)
     }
 
-    fn run(&mut self, shutdown: Arc<AtomicBool>) -> Result<UserExitInfo> {
+    fn run(&mut self, shutdown: Arc<AtomicBool>) -> Result<()> {
         let (res_ch, req_ch) = self.stats_server.channels();
         let mut next_sched_at = Instant::now() + self.sched_intv;
         let mut cpus_ranges = HashMap::<ThreadId, Vec<(usize, usize)>>::new();
 
-        while !shutdown.load(Ordering::Relaxed) && !uei_exited!(&self.skel, uei) {
+        while !shutdown.load(Ordering::Relaxed)
+            && !UserExitInfo::exited(&self.skel.maps.bss_data.uei)?
+        {
             let now = Instant::now();
 
             if now >= next_sched_at {
@@ -2226,7 +2350,7 @@ impl<'a, 'b> Scheduler<'a, 'b> {
         }
 
         self.struct_ops.take();
-        uei_report!(&self.skel, uei)
+        UserExitInfo::read(&self.skel.maps.bss_data.uei)?.report()
     }
 }
 
@@ -2418,6 +2542,10 @@ fn main() -> Result<()> {
         );
     }
 
+    if opts.open_metrics_format {
+        warn!("open_metrics_format is deprecated");
+    }
+
     debug!("specs={}", serde_json::to_string_pretty(&layer_config)?);
     verify_layer_specs(&layer_config.specs)?;
 
@@ -2439,12 +2567,6 @@ fn main() -> Result<()> {
     }
 
     let mut open_object = MaybeUninit::uninit();
-    loop {
-        let mut sched = Scheduler::init(&opts, &layer_config.specs, &mut open_object)?;
-        if !sched.run(shutdown.clone())?.should_restart() {
-            break;
-        }
-    }
-
-    Ok(())
+    let mut sched = Scheduler::init(&opts, &layer_config.specs, &mut open_object)?;
+    sched.run(shutdown.clone())
 }

@@ -56,7 +56,7 @@
 
 char _license[] SEC("license") = "GPL";
 
-UEI_DEFINE(uei);
+
 
 /*
  * const volatiles are set during initialization and treated as consts by the
@@ -85,6 +85,13 @@ const volatile u32 debug;
 
 /* base slice duration */
 static u64 slice_ns = SCX_SLICE_DFL;
+
+#define __COMPAT_scx_bpf_error(fmt, args...)            \
+	do {                                    \
+		bpf_printk(fmt, ##args);        \
+	} while (0)
+
+struct user_exit_info uei;
 
 /*
  * Per-CPU context
@@ -180,7 +187,7 @@ static struct dom_ctx *lookup_dom_ctx(u32 dom_id)
 
 	domc = try_lookup_dom_ctx(dom_id);
 	if (!domc)
-		scx_bpf_error("Failed to lookup dom[%u]", dom_id);
+		__COMPAT_scx_bpf_error("Failed to lookup dom[%u]", dom_id);
 
 	return domc;
 }
@@ -193,7 +200,7 @@ static u64 t_to_tptr(struct task_struct *p)
 	err = bpf_probe_read_kernel(&tptr, sizeof(tptr), &p);
 
 	if (err){
-		scx_bpf_error("Failed to cast task_struct addr to tptr");
+		__COMPAT_scx_bpf_error("Failed to cast task_struct addr to tptr");
 		return 0;
 	}
 	return tptr;
@@ -215,7 +222,7 @@ static struct task_ctx *lookup_task_ctx(struct task_struct *p)
 
 	taskc = try_lookup_task_ctx(p);
 	if (!taskc)
-		scx_bpf_error("task_ctx lookup failed for tptr %llu", tptr);
+		__COMPAT_scx_bpf_error("task_ctx lookup failed for tptr %llu", tptr);
 
 	return taskc;
 }
@@ -226,7 +233,7 @@ static struct pcpu_ctx *lookup_pcpu_ctx(s32 cpu)
 
 	pcpuc = MEMBER_VPTR(pcpu_ctx, [cpu]);
 	if (!pcpuc)
-		scx_bpf_error("Failed to lookup pcpu ctx for %d", cpu);
+		__COMPAT_scx_bpf_error("Failed to lookup pcpu ctx for %d", cpu);
 
 	return pcpuc;
 }
@@ -255,7 +262,7 @@ static struct bucket_ctx *lookup_dom_bucket(struct dom_ctx *dom_ctx,
 	if (bucket)
 		return bucket;
 
-	scx_bpf_error("Failed to lookup dom bucket");
+	__COMPAT_scx_bpf_error("Failed to lookup dom bucket");
 	return NULL;
 }
 
@@ -268,7 +275,7 @@ static struct lock_wrapper *lookup_dom_bkt_lock(u32 dom_id, u32 weight)
 	if (lockw)
 		return lockw;
 
-	scx_bpf_error("Failed to lookup dom lock");
+	__COMPAT_scx_bpf_error("Failed to lookup dom lock");
 	return NULL;
 }
 
@@ -279,7 +286,7 @@ static struct lock_wrapper *lookup_dom_vtime_lock(u32 dom_id)
 
 	lockw = bpf_map_lookup_elem(&dom_vtime_locks, &idx);
 	if (!lockw)
-		scx_bpf_error("Failed to lookup dom lock");
+		__COMPAT_scx_bpf_error("Failed to lookup dom lock");
 
 	return lockw;
 }
@@ -322,7 +329,7 @@ static void dom_dcycle_adj(u32 dom_id, u32 weight, u64 now, bool runnable)
 	bpf_spin_unlock(&lockw->lock);
 
 	if (adj < 0 && (s64)bucket->dcycle < 0)
-		scx_bpf_error("cpu%d dom%u bucket%u load underflow (dcycle=%lld adj=%lld)",
+		__COMPAT_scx_bpf_error("cpu%d dom%u bucket%u load underflow (dcycle=%lld adj=%lld)",
 			      bpf_get_smp_processor_id(), dom_id, bucket_idx,
 			      bucket->dcycle, adj);
 
@@ -424,7 +431,7 @@ static struct task_struct *tptr_to_task(u64 tptr)
 	err_task = bpf_probe_read_kernel(&p, sizeof(struct task_struct *), &task);
 
 	if (err_task)
-		scx_bpf_error("Failed to retrieve task_struct for tptr %llu", tptr);
+		__COMPAT_scx_bpf_error("Failed to retrieve task_struct for tptr %llu", tptr);
 	if (p)
 		return p;
 }
@@ -438,7 +445,7 @@ int dom_xfer_task(u64 tptr, u32 new_dom_id, u64 now)
 	p = tptr_to_task(tptr);
 
 	if (!p) {
-		scx_bpf_error("Failed to lookup task %llu", tptr);
+		__COMPAT_scx_bpf_error("Failed to lookup task %llu", tptr);
 		return 0;
 	}
 
@@ -599,7 +606,7 @@ const int sched_prio_to_weight[DL_MAX_LAT_PRIO + 1] = {
 static u64 sched_prio_to_latency_weight(u64 prio)
 {
 	if (prio >= DL_MAX_LAT_PRIO) {
-		scx_bpf_error("Invalid prio index");
+		__COMPAT_scx_bpf_error("Invalid prio index");
 		return 0;
 	}
 
@@ -789,7 +796,7 @@ static bool task_set_domain(struct task_ctx *taskc, struct task_struct *p,
 
 	t_cpumask = taskc->cpumask;
 	if (!t_cpumask) {
-		scx_bpf_error("Failed to look up task cpumask");
+		__COMPAT_scx_bpf_error("Failed to look up task cpumask");
 		return false;
 	}
 
@@ -808,7 +815,7 @@ static bool task_set_domain(struct task_ctx *taskc, struct task_struct *p,
 
 	d_cpumask = new_domc->cpumask;
 	if (!d_cpumask) {
-		scx_bpf_error("Failed to get dom%u cpumask kptr",
+		__COMPAT_scx_bpf_error("Failed to get dom%u cpumask kptr",
 			      new_dom_id);
 		return false;
 	}
@@ -859,7 +866,7 @@ static s32 try_sync_wakeup(struct task_struct *p, struct task_ctx *taskc,
 
 	d_cpumask = domc->cpumask;
 	if (!d_cpumask) {
-		scx_bpf_error("Failed to acquire dom%u cpumask kptr",
+		__COMPAT_scx_bpf_error("Failed to acquire dom%u cpumask kptr",
 				taskc->dom_id);
 		return -ENOENT;
 	}
@@ -1021,7 +1028,7 @@ s32 BPF_STRUCT_OPS(rusty_select_cpu, struct task_struct *p, s32 prev_cpu,
 
 		tmp_direct_greedy = direct_greedy_cpumask;
 		if (!tmp_direct_greedy) {
-			scx_bpf_error("Failed to lookup direct_greedy mask");
+			__COMPAT_scx_bpf_error("Failed to lookup direct_greedy mask");
 			goto enoent;
 		}
 		/*
@@ -1035,13 +1042,13 @@ s32 BPF_STRUCT_OPS(rusty_select_cpu, struct task_struct *p, s32 prev_cpu,
 		if (!direct_greedy_numa && domc) {
 			node_mask = domc->node_cpumask;
 			if (!node_mask) {
-				scx_bpf_error("Failed to lookup node mask");
+				__COMPAT_scx_bpf_error("Failed to lookup node mask");
 				goto enoent;
 			}
 
 			tmp_cpumask = bpf_kptr_xchg(&taskc->tmp_cpumask, NULL);
 			if (!tmp_cpumask) {
-				scx_bpf_error("Failed to lookup tmp cpumask");
+				__COMPAT_scx_bpf_error("Failed to lookup tmp cpumask");
 				goto enoent;
 			}
 			bpf_cpumask_and(tmp_cpumask,
@@ -1149,7 +1156,7 @@ void BPF_STRUCT_OPS(rusty_enqueue, struct task_struct *p, u64 enq_flags)
 	if (!(taskc = lookup_task_ctx(p)))
 		return;
 	if (!(p_cpumask = taskc->cpumask)) {
-		scx_bpf_error("NULL cpumask");
+		__COMPAT_scx_bpf_error("NULL cpumask");
 		return;
 	}
 
@@ -1240,7 +1247,7 @@ u32 dom_node_id(u32 dom_id)
 
 	nid_ptr = MEMBER_VPTR(dom_numa_id_map, [dom_id]);
 	if (!nid_ptr) {
-		scx_bpf_error("Couldn't look up node ID for %d", dom_id);
+		__COMPAT_scx_bpf_error("Couldn't look up node ID for %d", dom_id);
 		return 0;
 	}
 	return *nid_ptr;
@@ -1443,7 +1450,7 @@ void BPF_STRUCT_OPS(rusty_running, struct task_struct *p)
 
 	dom_id = taskc->dom_id;
 	if (dom_id >= MAX_DOMS) {
-		scx_bpf_error("Invalid dom ID");
+		__COMPAT_scx_bpf_error("Invalid dom ID");
 		return;
 	}
 
@@ -1460,7 +1467,7 @@ void BPF_STRUCT_OPS(rusty_running, struct task_struct *p)
 
 		tptrp = MEMBER_VPTR(dom_active_tptrs, [dom_id].tptrs[idx]);
 		if (!tptrp) {
-			scx_bpf_error("dom_active_tptrs[%u][%llu] indexing failed",
+			__COMPAT_scx_bpf_error("dom_active_tptrs[%u][%llu] indexing failed",
 				      dom_id, idx);
 			return;
 		}
@@ -1607,7 +1614,7 @@ static void task_pick_and_set_domain(struct task_ctx *taskc,
 		dom_id = task_pick_domain(taskc, p, cpumask);
 
 	if (!task_set_domain(taskc, p, dom_id, init_dsq_vtime))
-		scx_bpf_error("Failed to set dom%d for %s[%llu]",
+		__COMPAT_scx_bpf_error("Failed to set dom%d for %s[%llu]",
 			      dom_id, p->comm, tptr);
 }
 
@@ -1631,21 +1638,21 @@ static s32 create_save_cpumask(struct bpf_cpumask **kptr)
 
 	cpumask = bpf_cpumask_create();
 	if (!cpumask) {
-		scx_bpf_error("Failed to create cpumask");
+		__COMPAT_scx_bpf_error("Failed to create cpumask");
 		return -ENOMEM;
 	}
 
 	cpumask = bpf_kptr_xchg(kptr, cpumask);
 	if (cpumask) {
-		scx_bpf_error("kptr already had cpumask");
+		__COMPAT_scx_bpf_error("kptr already had cpumask");
 		bpf_cpumask_release(cpumask);
 	}
 
 	return 0;
 }
 
-s32 BPF_STRUCT_OPS(rusty_init_task, struct task_struct *p,
-		   struct scx_init_task_args *args)
+s32 BPF_STRUCT_OPS(rusty_prep_enable, struct task_struct *p,
+		   struct scx_enable_args *args)
 {
 	u64 now = bpf_ktime_get_ns();
 	struct task_ctx taskc = {
@@ -1700,9 +1707,9 @@ s32 BPF_STRUCT_OPS(rusty_init_task, struct task_struct *p,
 
 	return 0;
 }
-
-void BPF_STRUCT_OPS(rusty_exit_task, struct task_struct *p,
-		    struct scx_exit_task_args *args)
+/*
+void BPF_STRUCT_OPS(rusty_cancel_enable, struct task_struct *p,
+		    struct scx_enable_args *args)
 {
 	u64 tptr = t_to_tptr(p);
 	long ret;
@@ -1719,6 +1726,7 @@ void BPF_STRUCT_OPS(rusty_exit_task, struct task_struct *p,
 		return;
 	}
 }
+*/
 
 static s32 create_node(u32 node_id)
 {
@@ -1730,7 +1738,7 @@ static s32 create_node(u32 node_id)
 	nodec = bpf_map_lookup_elem(&node_data, &node_id);
 	if (!nodec) {
 		/* Should never happen, it's created statically at load time. */
-		scx_bpf_error("No node%u", node_id);
+		__COMPAT_scx_bpf_error("No node%u", node_id);
 		return -ENOENT;
 	}
 
@@ -1742,7 +1750,7 @@ static s32 create_node(u32 node_id)
 	cpumask = nodec->cpumask;
 	if (!cpumask) {
 		bpf_rcu_read_unlock();
-		scx_bpf_error("Failed to lookup node cpumask");
+		__COMPAT_scx_bpf_error("Failed to lookup node cpumask");
 		return -ENOENT;
 	}
 
@@ -1751,7 +1759,7 @@ static s32 create_node(u32 node_id)
 
 		nmask = MEMBER_VPTR(numa_cpumasks, [node_id][cpu / 64]);
 		if (!nmask) {
-			scx_bpf_error("array index error");
+			__COMPAT_scx_bpf_error("array index error");
 			ret = -ENOENT;
 			break;
 		}
@@ -1773,7 +1781,7 @@ static s32 create_dom(u32 dom_id)
 	s32 ret;
 
 	if (dom_id >= MAX_DOMS) {
-		scx_bpf_error("Max dom ID %u exceeded (%u)", MAX_DOMS, dom_id);
+		__COMPAT_scx_bpf_error("Max dom ID %u exceeded (%u)", MAX_DOMS, dom_id);
 		return -EINVAL;
 	}
 
@@ -1781,7 +1789,7 @@ static s32 create_dom(u32 dom_id)
 
 	ret = scx_bpf_create_dsq(dom_id, node_id);
 	if (ret < 0) {
-		scx_bpf_error("Failed to create dsq %u (%d)", dom_id, ret);
+		__COMPAT_scx_bpf_error("Failed to create dsq %u (%d)", dom_id, ret);
 		return ret;
 	}
 
@@ -1800,7 +1808,7 @@ static s32 create_dom(u32 dom_id)
 	all_mask = all_cpumask;
 	if (!dom_mask || !all_mask) {
 		bpf_rcu_read_unlock();
-		scx_bpf_error("Could not find cpumask");
+		__COMPAT_scx_bpf_error("Could not find cpumask");
 		return -ENOENT;
 	}
 
@@ -1809,7 +1817,7 @@ static s32 create_dom(u32 dom_id)
 
 		dmask = MEMBER_VPTR(dom_cpumasks, [dom_id][cpu / 64]);
 		if (!dmask) {
-			scx_bpf_error("array index error");
+			__COMPAT_scx_bpf_error("array index error");
 			ret = -ENOENT;
 			break;
 		}
@@ -1830,7 +1838,7 @@ static s32 create_dom(u32 dom_id)
 	nodec = bpf_map_lookup_elem(&node_data, &node_id);
 	if (!nodec) {
 		/* Should never happen, it's created statically at load time. */
-		scx_bpf_error("No node%u", node_id);
+		__COMPAT_scx_bpf_error("No node%u", node_id);
 		return -ENOENT;
 	}
 	ret = create_save_cpumask(&domc->node_cpumask);
@@ -1842,7 +1850,7 @@ static s32 create_dom(u32 dom_id)
 	dom_mask = domc->node_cpumask;
 	if (!node_mask || !dom_mask) {
 		bpf_rcu_read_unlock();
-		scx_bpf_error("cpumask lookup failed");
+		__COMPAT_scx_bpf_error("cpumask lookup failed");
 		return -ENOENT;
 	}
 	bpf_cpumask_copy(dom_mask, (const struct cpumask *)node_mask);
@@ -1873,7 +1881,7 @@ static s32 initialize_cpu(s32 cpu)
 		cpumask = domc->cpumask;
 		if (!cpumask) {
 			bpf_rcu_read_unlock();
-			scx_bpf_error("Failed to lookup dom node cpumask");
+			__COMPAT_scx_bpf_error("Failed to lookup dom node cpumask");
 			return -ENOENT;
 		}
 
@@ -1891,6 +1899,8 @@ static s32 initialize_cpu(s32 cpu)
 s32 BPF_STRUCT_OPS_SLEEPABLE(rusty_init)
 {
 	s32 i, ret;
+	
+  __COMPAT_scx_bpf_switch_all();
 
 	ret = create_save_cpumask(&all_cpumask);
 	if (ret)
@@ -1929,7 +1939,7 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(rusty_init)
 
 void BPF_STRUCT_OPS(rusty_exit, struct scx_exit_info *ei)
 {
-	UEI_RECORD(uei, ei);
+	uei_record(&uei, ei);
 }
 
 SCX_OPS_DEFINE(rusty,
@@ -1942,8 +1952,8 @@ SCX_OPS_DEFINE(rusty,
 	       .quiescent		= (void *)rusty_quiescent,
 	       .set_weight		= (void *)rusty_set_weight,
 	       .set_cpumask		= (void *)rusty_set_cpumask,
-	       .init_task		= (void *)rusty_init_task,
-	       .exit_task		= (void *)rusty_exit_task,
+	       .prep_enable		= (void *)rusty_prep_enable, 
+	       /* .cancel_enable		= (void *)rusty_cancel_enable, */
 	       .init			= (void *)rusty_init,
 	       .exit			= (void *)rusty_exit,
 	       .timeout_ms		= 10000,
