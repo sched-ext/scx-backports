@@ -143,8 +143,8 @@ static inline long scx_hotplug_seq(void)
 #define SCX_OPS_OPEN(__ops_name, __scx_name) ({					\
 	struct __scx_name *__skel;						\
 										\
-	SCX_BUG_ON(!__COMPAT_struct_has_field("sched_ext_ops", "dump"),		\
-		   "sched_ext_ops.dump() missing, kernel too old?");		\
+	/* SCX_BUG_ON(!__COMPAT_struct_has_field("sched_ext_ops", "dump"),	*/	\
+	/*	   "sched_ext_ops.dump() missing, kernel too old?");	*/	\
 										\
 	__skel = __scx_name##__open();						\
 	SCX_BUG_ON(!__skel, "Could not open " #__scx_name);			\

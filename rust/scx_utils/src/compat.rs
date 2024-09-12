@@ -164,9 +164,9 @@ macro_rules! unwrap_or_break {
 pub fn check_min_requirements() -> Result<()> {
     // ec7e3b0463e1 ("implement-ops") in https://github.com/sched-ext/sched_ext
     // is the current minimum required kernel version.
-    if let Ok(false) | Err(_) = struct_has_field("sched_ext_ops", "dump") {
-        bail!("sched_ext_ops.dump() missing, kernel too old?");
-    }
+    // if let Ok(false) | Err(_) = struct_has_field("sched_ext_ops", "dump") {
+    //     bail!("sched_ext_ops.dump() missing, kernel too old?");
+    // }
     Ok(())
 }
 
@@ -187,21 +187,21 @@ macro_rules! scx_ops_open {
             };
 
             let ops = skel.struct_ops.[<$ops _mut>]();
-            let path = std::path::Path::new("/sys/kernel/sched_ext/hotplug_seq");
+            //    let path = std::path::Path::new("/sys/kernel/sched_ext/hotplug_seq");
 
-            let val = match std::fs::read_to_string(&path) {
-                Ok(val) => val,
-                Err(_) => {
-                    break 'block Err(anyhow::anyhow!("Failed to open or read file {:?}", path));
-                }
-            };
+            //     let val = match std::fs::read_to_string(&path) {
+            //         Ok(val) => val,
+            //         Err(_) => {
+            //             break 'block Err(anyhow::anyhow!("Failed to open or read file {:?}", path));
+            //         }
+            //     };
 
-            ops.hotplug_seq = match val.trim().parse::<u64>() {
-                Ok(parsed) => parsed,
-                Err(_) => {
-                    break 'block Err(anyhow::anyhow!("Failed to parse hotplug seq {}", val));
-                }
-            };
+            //     ops.hotplug_seq = match val.trim().parse::<u64>() {
+            //         Ok(parsed) => parsed,
+            //         Err(_) => {
+            //             break 'block Err(anyhow::anyhow!("Failed to parse hotplug seq {}", val));
+            //         }
+            //     };
 
             let result : Result<OpenBpfSkel<'_>, anyhow::Error> = Ok(skel);
             result
@@ -218,7 +218,7 @@ macro_rules! scx_ops_open {
 macro_rules! scx_ops_load {
     ($skel: expr, $ops: ident, $uei: ident) => { 'block: {
         scx_utils::paste! {
-            scx_utils::uei_set_size!($skel, $ops, $uei);
+            //scx_utils::uei_set_size!($skel, $ops, $uei);
             $skel.load().context("Failed to load BPF program")
         }
     }};
