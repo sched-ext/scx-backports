@@ -362,7 +362,7 @@ impl BpfBuilder {
     }
 
     /// Return `(VER, SHA1)` from which the bulit-in `vmlinux.h` is generated.
-    pub fn vmlinux_h_ver_sha1() -> (String, String) {
+    pub fn vmlinux_h_ver_sha1() -> String {
         let mut ar = tar::Archive::new(Self::BPF_H_TAR);
 
         for file in ar.entries().unwrap() {
@@ -378,7 +378,7 @@ impl BpfBuilder {
                 .to_string_lossy()
                 .to_string();
 
-            return sscanf!(name, "vmlinux-v{String}-g{String}.h").unwrap();
+            return sscanf!(name, "vmlinux-{String}.h").unwrap();
         }
 
         panic!("vmlinux/vmlinux.h not found");
@@ -586,15 +586,10 @@ mod tests {
 
     #[test]
     fn test_vmlinux_h_ver_sha1() {
-        let (ver, sha1) = super::BpfBuilder::vmlinux_h_ver_sha1();
+        let ver = super::BpfBuilder::vmlinux_h_ver_sha1();
 
-        println!("vmlinux.h: ver={:?} sha1={:?}", &ver, &sha1,);
+        println!("vmlinux.h: ver={:?}", &ver);
 
-        assert!(regex::Regex::new(r"^([1-9][0-9]*\.[1-9][0-9][a-z0-9-]*)$")
-            .unwrap()
-            .is_match(&ver));
-        assert!(regex::Regex::new(r"^[0-9a-z]{12}$")
-            .unwrap()
-            .is_match(&sha1));
+        assert!(regex::Regex::new(r"^[a-f0-9]{7}$").unwrap().is_match(&ver));
     }
 }
