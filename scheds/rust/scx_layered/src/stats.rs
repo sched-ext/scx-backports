@@ -240,6 +240,15 @@ impl LayerStats {
 
         writeln!(
             w,
+            "  {:<width$}  xlayer_wake={} xlayer_rewake={}",
+            "",
+            fmt_pct(self.xlayer_wake),
+            fmt_pct(self.xlayer_rewake),
+            width = header_width,
+        )?;
+
+        writeln!(
+            w,
             "  {:<width$}  keep/max/busy={}/{}/{} kick={} yield/ign={}/{}",
             "",
             fmt_pct(self.keep),
@@ -253,15 +262,13 @@ impl LayerStats {
 
         writeln!(
             w,
-            "  {:<width$}  open_idle={} mig={} xnuma_mig={} xllc_mig={} affn_viol={} xlayer_wake={} xlayer_rewake={}",
+            "  {:<width$}  open_idle={} mig={} xnuma_mig={} xllc_mig={} affn_viol={}",
             "",
             fmt_pct(self.open_idle),
             fmt_pct(self.migration),
             fmt_pct(self.xnuma_migration),
             fmt_pct(self.xllc_migration),
             fmt_pct(self.affn_viol),
-            fmt_pct(self.xlayer_wake),
-            fmt_pct(self.xlayer_rewake),
             width = header_width,
         )?;
 
