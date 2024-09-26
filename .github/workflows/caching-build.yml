@@ -3,7 +3,8 @@ name: build-and-test
 on:
     push:
     pull_request:
-
+    merge_group:
+      
 jobs:
   lint:
     runs-on: ubuntu-24.04
