@@ -2,6 +2,5 @@ libbpf/
 *.gitignore
 PKGBUILD
 target
-local-linux-checkout
-.cache
-
+*.swp
+.cache/
