@@ -285,10 +285,10 @@ jobs:
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
       # get latest head commit of sched_ext for-next
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=$(git ls-remote https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git heads/for-next | awk '{print $1}')" >> $GITHUB_ENV
-
-      - name: Cache Kernel
-        id: cache-kernel
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=35aacc4" >> $GITHUB_ENV
+      # cache bzImage alone for rust tests
+      - name: Cache bzImage
+        id: cache-bzImage
         uses: actions/cache@v4
         with:
           path: |
@@ -328,10 +328,10 @@ jobs:
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
       # get latest head commit of sched_ext for-next
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=$(git ls-remote https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git heads/for-next | awk '{print $1}')" >> $GITHUB_ENV
-      # Cache Kernel alone for rust tests
-      - name: Cache Kernel
-        id: cache-kernel
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=35aacc4" >> $GITHUB_ENV
+      # cache bzImage alone for rust tests
+      - name: Cache bzImage
+        id: cache-bzImage
         uses: actions/cache@v4
         with:
           path: |
