@@ -285,10 +285,11 @@ jobs:
       - if: ${{ steps.cache-virtiofsd.outputs.cache-hit != 'true' }}
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=$(git ls-remote https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git heads/for-6.13 | awk '{print $1}')" >> $GITHUB_ENV
-
-      - name: Cache Kernel
-        id: cache-kernel
+      # get latest head commit of sched_ext for-next
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=35aacc4" >> $GITHUB_ENV
+      # cache bzImage alone for rust tests
+      - name: Cache bzImage
+        id: cache-bzImage
         uses: actions/cache@v4
         with:
           path: |
@@ -327,10 +328,11 @@ jobs:
       - if: ${{ steps.cache-virtiofsd.outputs.cache-hit != 'true' }}
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=$(git ls-remote https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git heads/for-6.13 | awk '{print $1}')" >> $GITHUB_ENV
-      # Cache Kernel alone for rust tests
-      - name: Cache Kernel
-        id: cache-kernel
+      # get latest head commit of sched_ext for-next
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=35aacc4" >> $GITHUB_ENV
+      # cache bzImage alone for rust tests
+      - name: Cache bzImage
+        id: cache-bzImage
         uses: actions/cache@v4
         with:
           path: |
@@ -367,7 +369,7 @@ jobs:
           RUSTDOCFLAGS="--enable-index-page -Zunstable-options" cargo +nightly doc --workspace --no-deps --bins --lib --examples --document-private-items
           sudo apt install build-essential graphviz sphinx-doc python3-sphinx-rtd-theme texlive-latex-recommended python3-yaml -y
           cargo install htmlq
-          git clone --single-branch -b for-6.13 --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git linux
+          git clone --single-branch -b for-next --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git linux
           cd linux
           make DOCS_THEME=sphinx_rtd_theme SPHINXDIRS=scheduler htmldocs
           make DOCS_THEME=sphinx_rtd_theme SPHINXDIRS=bpf htmldocs
