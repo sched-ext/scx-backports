@@ -14,7 +14,9 @@ RUN apt update && apt install -y build-essential \
     binutils-dev \
     pkg-config \
     git \
-    python3-pip \    
+    python3-pip \
+    pahole \
+    dwarves \
     --no-install-recommends && \
     apt -y build-dep linux --no-install-recommends && \
     apt clean && rm -rf /var/lib/apt/lists/*
