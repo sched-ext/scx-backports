@@ -181,9 +181,9 @@ jobs:
 
       # get latest head commit of sched_ext for-next
       - run: echo "SCHED_EXT_KERNEL_COMMIT=fc86083" >> $GITHUB_ENV
-      # cache bzImage alone for rust tests
+      # Cache Kernel alone for rust tests
       - name: Cache bzImage
-        id: cache-bzImage
+        id: cache-kernel
         uses: actions/cache@v4
         with:
           path: |
@@ -225,9 +225,9 @@ jobs:
 
       # get latest head commit of sched_ext for-next
       - run: echo "SCHED_EXT_KERNEL_COMMIT=fc86083" >> $GITHUB_ENV
-      # cache bzImage alone for rust tests
+      # Cache Kernel alone for rust tests
       - name: Cache bzImage
-        id: cache-bzImage
+        id: cache-kernel
         uses: actions/cache@v4
         with:
           path: |
