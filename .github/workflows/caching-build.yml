@@ -177,8 +177,24 @@ jobs:
         package: [ scx_loader, scx_rustland_core, scx_stats, scx_utils, scxtop, scx_bpfland, scx_chaos, scx_lavd, scx_layered, scx_rlfifo, scx_rustland, scx_rusty, scx_p2dq, scx_tickless ]
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-deps-action
+      # cache virtiofsd (goes away w/ 24.04)
+      - name: Cache virtiofsd
+        id: cache-virtiofsd
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/lib/virtiofsd
+          key: virtiofsd-binary
+      - if: ${{ steps.cache-virtiofsd.outputs.cache-hit != 'true' }}
+        run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
-      - uses: ./.github/actions/restore-kernel-cache
+      # get latest head commit of sched_ext for-next
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=35aacc4" >> $GITHUB_ENV
+      # cache bzImage alone for rust tests
+      - name: Cache bzImage
+        id: cache-bzImage
+        uses: actions/cache@v4
         with:
           repo-name: sched_ext/for-next
 
@@ -196,7 +212,18 @@ jobs:
       - if: ${{ steps.cache-virtiofsd.outputs.cache-hit != 'true' }}
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
-      - run: cargo build --all-targets --package ${{ matrix.package }}
+      # get latest head commit of sched_ext for-next
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=35aacc4" >> $GITHUB_ENV
+      # cache bzImage alone for rust tests
+      - name: Cache bzImage
+        id: cache-bzImage
+        uses: actions/cache@v4
+        with:
+          path: |
+            linux/arch/x86/boot/bzImage
+            linux/usr/include
+            linux/**/*.h
+          key: kernel-build-${{ env.SCHED_EXT_KERNEL_COMMIT }}-5
 
       - name: Clippy
         if: contains(fromJSON('["scxtop", "scx_chaos"]'), matrix.package)
