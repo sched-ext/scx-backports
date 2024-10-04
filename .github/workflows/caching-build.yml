@@ -15,7 +15,7 @@ jobs:
       - run: sudo apt-get install -y git --no-install-recommends
       # get latest head commit of sched_ext for-next
 
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=21f4c19" >> $GITHUB_ENV
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=fc86083" >> $GITHUB_ENV
       - uses: actions/checkout@v4
 
       # use cached kernel if available, create after job if not
@@ -95,7 +95,7 @@ jobs:
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
       # get latest head commit of sched_ext for-next
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=21f4c19" >> $GITHUB_ENV
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=fc86083" >> $GITHUB_ENV
 
       # use cached kernel if available, create after job if not
       - name: Cache Kernel
@@ -180,7 +180,7 @@ jobs:
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
       # get latest head commit of sched_ext for-next
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=21f4c19" >> $GITHUB_ENV
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=fc86083" >> $GITHUB_ENV
       # cache bzImage alone for rust tests
       - name: Cache bzImage
         id: cache-bzImage
@@ -224,7 +224,7 @@ jobs:
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
       # get latest head commit of sched_ext for-next
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=21f4c19" >> $GITHUB_ENV
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=fc86083" >> $GITHUB_ENV
       # cache bzImage alone for rust tests
       - name: Cache bzImage
         id: cache-bzImage
