@@ -31,11 +31,19 @@ cd /sched-ext-linux
 git checkout "$SHORT_SHA"
 
 # this is for backports and mixing new bpf with old kernel
-find . -type f -exec sed -i 's/-Werror/-Wno-error/g' {} \;
+# we only care about generated vmlinux.h, so make build work.
+
+echo '' >> /sched-ext.config
+
+echo 'CONFIG_DEBUG_INFO_DWARF4=y' >> /sched-ext.config
+echo 'CONFIG_DEBUG_INFO_BTF=y' >> /sched-ext.config
+echo 'CONFIG_DEBUG_INFO=y' >> /sched-ext.config
 
 vng -v --kconfig --config /sched-ext.config
 
-make -j "$(nproc)"
+make ARCH=x86 KCFLAGS="-fno-pic -fno-stack-protector" -j "$(nproc)" all 
+
+pahole -J /sched-ext-linux/vmlinux
 
 bpftool btf dump file "/sched-ext-linux/vmlinux" format c > "/vmlinux-${SHORT_SHA}.h"
 
