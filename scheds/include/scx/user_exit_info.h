@@ -10,6 +10,10 @@
 #ifndef __USER_EXIT_INFO_H
 #define __USER_EXIT_INFO_H
 
+#ifdef LSP 
+#define __bpf__
+#endif 
+
 enum uei_sizes {
 	UEI_REASON_LEN		= 128,
 	UEI_MSG_LEN		= 1024,
@@ -18,7 +22,7 @@ enum uei_sizes {
 
 struct user_exit_info {
 	int		kind;
-	s64		exit_code;
+	// s64		exit_code;
 	char		reason[UEI_REASON_LEN];
 	char		msg[UEI_MSG_LEN];
 };
@@ -35,17 +39,13 @@ struct user_exit_info {
 #define UEI_DEFINE(__name)							\
 	char RESIZABLE_ARRAY(data, __name##_dump);				\
 	const volatile u32 __name##_dump_len;					\
-	struct user_exit_info __name SEC(".data")
+  struct user_exit_info __name SEC(".data")
 
 #define UEI_RECORD(__uei_name, __ei) ({						\
 	bpf_probe_read_kernel_str(__uei_name.reason,				\
 				  sizeof(__uei_name.reason), (__ei)->reason);	\
 	bpf_probe_read_kernel_str(__uei_name.msg,				\
 				  sizeof(__uei_name.msg), (__ei)->msg);		\
-	bpf_probe_read_kernel_str(__uei_name##_dump,				\
-				  __uei_name##_dump_len, (__ei)->dump);		\
-	if (bpf_core_field_exists((__ei)->exit_code))				\
-		__uei_name.exit_code = (__ei)->exit_code;			\
 	/* use __sync to force memory barrier */				\
 	__sync_val_compare_and_swap(&__uei_name.kind, __uei_name.kind,		\
 				    (__ei)->kind);				\
@@ -81,20 +81,20 @@ struct user_exit_info {
 	if (__uei->msg[0] != '\0')						\
 		fprintf(stderr, " (%s)", __uei->msg);				\
 	fputs("\n", stderr);							\
-	__uei->exit_code;							\
+	// __uei->exit_code;							\
 })
 
 /*
  * We can't import vmlinux.h while compiling user C code. Let's duplicate
  * scx_exit_code definition.
  */
-enum scx_exit_code {
-	/* Reasons */
-	SCX_ECODE_RSN_HOTPLUG		= 1LLU << 32,
-
-	/* Actions */
-	SCX_ECODE_ACT_RESTART		= 1LLU << 48,
-};
+// enum scx_exit_code {
+// 	/* Reasons */
+// 	SCX_ECODE_RSN_HOTPLUG		= 1LLU << 32,
+//
+// 	/* Actions */
+// 	SCX_ECODE_ACT_RESTART		= 1LLU << 48,
+// };
 
 enum uei_ecode_mask {
 	UEI_ECODE_USER_MASK		= ((1LLU << 32) - 1),

@@ -4,7 +4,7 @@
 // GNU General Public License version 2.
 use crate::bindings;
 use crate::compat;
-use anyhow::bail;
+// use anyhow::bail;
 use anyhow::Result;
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -33,17 +33,17 @@ pub enum ScxExitKind {
     None = bindings::scx_exit_kind_SCX_EXIT_NONE as isize,
     Done = bindings::scx_exit_kind_SCX_EXIT_DONE as isize,
     Unreg = bindings::scx_exit_kind_SCX_EXIT_UNREG as isize,
-    UnregBPF = bindings::scx_exit_kind_SCX_EXIT_UNREG_BPF as isize,
-    UnregKern = bindings::scx_exit_kind_SCX_EXIT_UNREG_KERN as isize,
-    SysRq = bindings::scx_exit_kind_SCX_EXIT_SYSRQ as isize,
+    // UnregBPF = bindings::scx_exit_kind_SCX_EXIT_UNREG_BPF as isize,
+    // UnregKern = bindings::scx_exit_kind_SCX_EXIT_UNREG_KERN as isize,
+    // SysRq = bindings::scx_exit_kind_SCX_EXIT_SYSRQ as isize,
     Error = bindings::scx_exit_kind_SCX_EXIT_ERROR as isize,
     ErrorBPF = bindings::scx_exit_kind_SCX_EXIT_ERROR_BPF as isize,
     ErrorStall = bindings::scx_exit_kind_SCX_EXIT_ERROR_STALL as isize,
 }
 
-pub enum ScxConsts {
-    ExitDumpDflLen = bindings::scx_consts_SCX_EXIT_DUMP_DFL_LEN as isize,
-}
+// pub enum ScxConsts {
+//     ExitDumpDflLen = bindings::scx_consts_SCX_EXIT_DUMP_DFL_LEN as isize,
+// }
 
 /// Takes a reference to C struct user_exit_info and reads it into
 /// UserExitInfo. See UserExitInfo.
@@ -53,58 +53,17 @@ macro_rules! uei_read {
         scx_utils::paste! {
             let bpf_uei = $skel.maps.data_data.$uei;
             let bpf_dump = scx_utils::UEI_DUMP_PTR_MUTEX.lock().unwrap().ptr;
-            let exit_code_ptr = match scx_utils::compat::struct_has_field("scx_exit_info", "exit_code") {
-                Ok(true) => &bpf_uei.exit_code as *const _,
-                _ => std::ptr::null(),
-            };
 
             scx_utils::UserExitInfo::new(
                 &bpf_uei.kind as *const _,
-                exit_code_ptr,
                 bpf_uei.reason.as_ptr() as *const _,
                 bpf_uei.msg.as_ptr() as *const _,
-                bpf_dump,
             )
         }
     }};
 }
 
-/// Resize debug dump area according to ops.exit_dump_len. If this macro is
-/// not called, debug dump area is not allocated and debug dump won't be
-/// printed out.
-#[macro_export]
-macro_rules! uei_set_size {
-    ($skel: expr, $ops: ident, $uei:ident) => {{
-        scx_utils::paste! {
-            let len = match $skel.struct_ops.$ops().exit_dump_len {
-                0 => scx_utils::ScxConsts::ExitDumpDflLen as u32,
-                v => v,
-            };
-            $skel.maps.rodata_data.[<$uei _dump_len>] = len;
-            $skel.maps.[<data_ $uei _dump>].set_value_size(len).unwrap();
 
-            let mut ptr = scx_utils::UEI_DUMP_PTR_MUTEX.lock().unwrap();
-            *ptr = scx_utils::UeiDumpPtr { ptr:
-                       $skel
-                       .maps
-                       .[<data_ $uei _dump>]
-                       .initial_value()
-                       .unwrap()
-                       .as_ptr() as *const _,
-            };
-        }
-    }};
-}
-
-/// Takes a reference to C struct user_exit_info and test whether the BPF
-/// scheduler has exited. See UserExitInfo.
-#[macro_export]
-macro_rules! uei_exited {
-    ($skel: expr, $uei:ident) => {{
-        let bpf_uei = $skel.maps.data_data.uei;
-        (unsafe { std::ptr::read_volatile(&bpf_uei.kind as *const _) } != 0)
-    }};
-}
 
 /// Takes a reference to C struct user_exit_info, reads, invokes
 /// UserExitInfo::report() on and then returns Ok(uei). See UserExitInfo.
@@ -122,10 +81,8 @@ pub struct UserExitInfo {
     /// The C enum scx_exit_kind value. Test against ScxExitKind. None-zero
     /// value indicates that the BPF scheduler has exited.
     kind: i32,
-    exit_code: i64,
     reason: Option<String>,
     msg: Option<String>,
-    dump: Option<String>,
 }
 
 impl UserExitInfo {
@@ -179,10 +136,8 @@ impl UserExitInfo {
 
         Self {
             kind,
-            exit_code,
             reason,
             msg,
-            dump,
         }
     }
 
@@ -194,36 +149,31 @@ impl UserExitInfo {
             return Ok(());
         }
 
-        if let Some(dump) = &self.dump {
-            eprintln!("\nDEBUG DUMP");
-            eprintln!("================================================================================\n");
-            eprintln!("{}", dump);
-            eprintln!("================================================================================\n");
-        }
+        // let why = match (&self.reason, &self.msg) {
+        //     (Some(reason), None) => format!("EXIT: {}", reason),
+        //     (Some(reason), Some(msg)) => format!("EXIT: {} ({})", reason, msg),
+        //     _ => "<UNKNOWN>".into(),
+        // };
 
-        let why = match (&self.reason, &self.msg) {
-            (Some(reason), None) => format!("EXIT: {}", reason),
-            (Some(reason), Some(msg)) => format!("EXIT: {} ({})", reason, msg),
-            _ => "<UNKNOWN>".into(),
-        };
-
-        if self.kind <= ScxExitKind::UnregKern as i32 {
-            eprintln!("{}", why);
-            Ok(())
-        } else {
-            bail!("{}", why)
-        }
+        // if self.kind <= ScxExitKind::UnregKern as i32 {
+        //     eprintln!("{}", why);
+        //     Ok(())
+        // } else {
+        //     bail!("{}", why)
+        // }
+        Ok(())
     }
 
     /// Return the exit code that the scheduler gracefully exited with. This
     /// only applies when the BPF scheduler exits with scx_bpf_exit(), i.e. kind
     /// ScxExitKind::UnregBPF.
     pub fn exit_code(&self) -> Option<i64> {
-        if self.kind == ScxExitKind::UnregBPF as i32 || self.kind == ScxExitKind::UnregKern as i32 {
-            Some(self.exit_code)
-        } else {
-            None
-        }
+        // if self.kind == ScxExitKind::UnregBPF as i32 || self.kind == ScxExitKind::UnregKern as i32 {
+        //     Some(self.exit_code)
+        // } else {
+        //     None
+        // }
+        return Some(0)
     }
 
     /// Test whether the BPF scheduler requested restart.

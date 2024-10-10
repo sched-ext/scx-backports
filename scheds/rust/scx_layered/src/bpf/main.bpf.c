@@ -2040,50 +2040,6 @@ static void dump_layer_cpumask(int idx)
 	scx_bpf_dump("%s", buf);
 }
 
-void BPF_STRUCT_OPS(layered_dump, struct scx_dump_ctx *dctx)
-{
-	u64 now = bpf_ktime_get_ns();
-	u64 dsq_id;
-	int i, j, idx;
-	struct layer *layer;
-
-	bpf_for(i, 0, nr_layers) {
-		layer = lookup_layer(i);
-		if (!layer) {
-			scx_bpf_error("unabled to lookup layer %d", i);
-			continue;
-		}
-
-		if (disable_topology) {
-			scx_bpf_dump("LAYER[%d] nr_cpus=%u nr_queued=%d -%llums cpus=",
-				     i, layers[i].nr_cpus, scx_bpf_dsq_nr_queued(i),
-				     dsq_first_runnable_for_ms(i, now));
-		} else {
-			bpf_for(j, 0, nr_llcs) {
-				if (!(layer->cache_mask & (1 << j)))
-					continue;
-
-				idx = layer_dsq_id(layer->idx, j);
-				scx_bpf_dump("LAYER[%d]DSQ[%d] nr_cpus=%u nr_queued=%d -%llums cpus=",
-					     i, idx, layers[i].nr_cpus, scx_bpf_dsq_nr_queued(idx),
-					     dsq_first_runnable_for_ms(idx, now));
-				scx_bpf_dump("\n");
-			}
-		}
-		dump_layer_cpumask(i);
-		scx_bpf_dump("\n");
-	}
-	bpf_for(i, 0, nr_llcs) {
-		dsq_id = llc_hi_fallback_dsq_id(i);
-		scx_bpf_dump("HI_FALLBACK[%llu] nr_queued=%d -%llums\n",
-			     dsq_id, scx_bpf_dsq_nr_queued(dsq_id),
-			     dsq_first_runnable_for_ms(dsq_id, now));
-	}
-	scx_bpf_dump("LO_FALLBACK nr_queued=%d -%llums\n",
-		     scx_bpf_dsq_nr_queued(LO_FALLBACK_DSQ),
-		     dsq_first_runnable_for_ms(LO_FALLBACK_DSQ, now));
-}
-
 static void print_iter_order() {
 	struct cpu_ctx *cctx;
 	int i;
@@ -2318,7 +2274,6 @@ SCX_OPS_DEFINE(layered,
 	       .cpu_release		= (void *)layered_cpu_release,
 	       .init_task		= (void *)layered_init_task,
 	       .exit_task		= (void *)layered_exit_task,
-	       .dump			= (void *)layered_dump,
 	       .init			= (void *)layered_init,
 	       .exit			= (void *)layered_exit,
 	       .name			= "layered");

@@ -42,7 +42,7 @@ mod builder;
 pub use builder::Builder;
 
 mod user_exit_info;
-pub use user_exit_info::ScxConsts;
+// pub use user_exit_info::ScxConsts;
 pub use user_exit_info::ScxExitKind;
 pub use user_exit_info::UeiDumpPtr;
 pub use user_exit_info::UserExitInfo;
@@ -72,7 +72,7 @@ pub use topology::NR_CPU_IDS;
 mod cpumask;
 pub use cpumask::Cpumask;
 
-mod gpu;
+// mod gpu;
 
 mod infeasible;
 pub use infeasible::LoadAggregator;
