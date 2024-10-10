@@ -47,6 +47,11 @@ static u32 preempt_cursor;
 #define dbg(fmt, args...)	do { if (debug) bpf_printk(fmt, ##args); } while (0)
 #define trace(fmt, args...)	do { if (debug > 1) bpf_printk(fmt, ##args); } while (0)
 
+
+#define __COMPAT_DSQ_FOR_EACH(p, dsq_id, flags)					\
+	if (bpf_ksym_exists(bpf_iter_scx_dsq_new))				\
+		bpf_for_each(scx_dsq, (p), (dsq_id), (flags))
+
 #include "util.bpf.c"
 
 UEI_DEFINE(uei);
@@ -2002,7 +2007,7 @@ static u64 dsq_first_runnable_for_ms(u64 dsq_id, u64 now)
 	if (dsq_id > LO_FALLBACK_DSQ)
 		return 0;
 
-	bpf_for_each(scx_dsq, p, dsq_id, 0) {
+	__COMPAT_DSQ_FOR_EACH( p, dsq_id, 0) {
 		struct task_ctx *tctx;
 
 		if ((tctx = lookup_task_ctx(p)))
