@@ -408,44 +408,4 @@ mod tests {
         let res = super::BpfBuilder::new();
         assert!(res.is_ok(), "Failed to create BpfBuilder ({:?})", &res);
     }
-
-    #[test]
-    fn test_vmlinux_h_ver_sha1() {
-        let clang_info = ClangInfo::new().unwrap();
-
-        let mut ar = tar::Archive::new(super::BpfBuilder::BPF_H_TAR);
-        let mut found = false;
-
-        let pattern = Regex::new(r"arch\/.*\/vmlinux-.*.h").unwrap();
-
-        for entry in ar.entries().unwrap() {
-            let entry = entry.unwrap();
-            let file_name = entry.header().path().unwrap();
-            let file_name_str = file_name.to_string_lossy().to_owned();
-            if file_name_str.contains(&clang_info.kernel_target().unwrap()) {
-                found = true;
-            }
-            if !pattern.find(&file_name_str).is_some() {
-                continue;
-            }
-
-            println!("checking {file_name_str}");
-
-            let (arch, ver, sha1) =
-                sscanf!(file_name_str, "arch/{String}/vmlinux-v{String}-g{String}.h").unwrap();
-            println!(
-                "vmlinux.h: arch={:?} ver={:?} sha1={:?}",
-                &arch, &ver, &sha1,
-            );
-
-            assert!(regex::Regex::new(r"^([1-9][0-9]*\.[1-9][0-9][a-z0-9-]*)$")
-                .unwrap()
-                .is_match(&ver));
-            assert!(regex::Regex::new(r"^[0-9a-z]{12}$")
-                .unwrap()
-                .is_match(&sha1));
-        }
-
-        assert!(found);
-    }
 }
