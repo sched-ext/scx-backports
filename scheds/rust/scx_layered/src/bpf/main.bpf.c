@@ -12,7 +12,7 @@
 #endif
 
 #include "intf.h"
-#include "timer.bpf.h"
+#include "timer.bpf.h.h"
 
 #include <errno.h>
 #include <stdbool.h>
@@ -59,7 +59,7 @@ extern unsigned CONFIG_HZ __kconfig;
 #define dbg(fmt, args...)	do { if (debug) bpf_printk(fmt, ##args); } while (0)
 #define trace(fmt, args...)	do { if (debug > 1) bpf_printk(fmt, ##args); } while (0)
 
-#include "util.bpf.c"
+#include "util.bpf.h"
 
 UEI_DEFINE(uei);
 
@@ -368,7 +368,7 @@ static bool refresh_cpumasks(u32 layer_id)
 
 // TODO: Refactor includes that have circular dependencies. This import must be
 // defined after some helpers, but before it's helpers are used.
-#include "cost.bpf.c"
+#include "cost.bpf.h"
 
 /*
  * Refreshes all layer cpumasks, this is called via BPF_PROG_RUN from userspace.
@@ -2470,7 +2470,7 @@ struct layered_timer layered_timers[MAX_TIMERS] = {
 };
 
 // TODO: separate this out to a separate compilation unit
-#include "timer.bpf.c"
+#include "timer.bpf.h"
 
 /*
  * Initializes per-layer specific data structures.
