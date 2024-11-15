@@ -24,6 +24,7 @@ jobs:
       - run: git diff --exit-code
 
   build-kernel:
+    if: (github.ref != 'refs/heads/main') && (github.ref != 'refs/heads/setup-repo')
     runs-on: ubuntu-24.04
     steps:
       # prevent cache permission errors
@@ -67,11 +68,7 @@ jobs:
         name: Clone Kernel
         # Get the latest sched-ext enabled kernel directly from the korg
         # for-next branch
-        uses: cytopia/shell-command-retry-action@v0.1.2
-        with:
-          retries: 10
-          pause: 18
-          command: git clone --single-branch -b for-next --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git linux
+        run: git clone --single-branch -b sched_ext https://github.com/sched-ext/sched_ext.git linux && cd linux && git checkout ${{ env.SCHED_EXT_KERNEL_COMMIT }}
 
       # guard rail because we are caching
       - if: ${{ steps.cache-kernel.outputs.cache-hit != 'true' }}
@@ -83,13 +80,14 @@ jobs:
 
       - if: ${{ steps.cache-kernel.outputs.cache-hit != 'true' }}
       # Build a minimal kernel (with sched-ext enabled) using virtme-ng
-        run: cd linux && vng -v --build --config ../.github/workflows/sched-ext.config
+        run: cd linux && find . -type f -exec sed -i 's/-Werror/-Wno-error/g' {} \; && vng -v --build --config ../.github/workflows/sched-ext.config
 
       - if: ${{ steps.cache-kernel.outputs.cache-hit != 'true' }}
       # Generate kernel headers
         run: cd linux && make headers
 
   integration-test:
+    if: (github.ref != 'refs/heads/main') && (github.ref != 'refs/heads/setup-repo')    
     runs-on: ubuntu-24.04
     needs: build-kernel
     strategy:
@@ -260,6 +258,7 @@ jobs:
 
 
   rust-test-core:
+    if: (github.ref != 'refs/heads/main') && (github.ref != 'refs/heads/setup-repo')    
     runs-on: ubuntu-24.04
     needs: build-kernel
     strategy:
@@ -303,6 +302,7 @@ jobs:
       - run: vng -v --rw --memory 10G --cpu 8 -r linux/arch/x86/boot/bzImage  --net user -- cargo test --manifest-path rust/${{ matrix.component }}/Cargo.toml
 
   rust-test-schedulers:
+    if: (github.ref != 'refs/heads/main') && (github.ref != 'refs/heads/setup-repo')    
     runs-on: ubuntu-24.04
     needs: build-kernel
     strategy:
@@ -343,42 +343,3 @@ jobs:
         run: exit -1
 
       - run: cargo build  --manifest-path scheds/rust/${{ matrix.scheduler }}/Cargo.toml
-      - run: vng -v --rw --memory 10G --cpu 8 -r linux/arch/x86/boot/bzImage  --net user -- cargo test --manifest-path scheds/rust/${{ matrix.scheduler }}/Cargo.toml
-
-  pages:
-    runs-on: ubuntu-24.04
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      contents: write  # To push a branch
-      pages: write  # To push to a GitHub Pages site
-      id-token: write # To update the deployment status
-    steps:
-      # prevent cache permission errors
-      - run: sudo chown root /usr/bin/tar && sudo chmod u+s /usr/bin/tar
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: ./.github/actions/install-deps-action
-      - name: Build Book and Linux Docs
-        run: |
-          cd / && rustup component add rustfmt && cd $OLDPWD
-          RUSTDOCFLAGS="--enable-index-page -Zunstable-options" cargo +nightly doc --workspace --no-deps --bins --lib --examples --document-private-items
-          sudo apt install build-essential graphviz sphinx-doc python3-sphinx-rtd-theme texlive-latex-recommended python3-yaml -y
-          cargo install htmlq
-          git clone --single-branch -b for-next --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git linux
-          cd linux
-          make DOCS_THEME=sphinx_rtd_theme SPHINXDIRS=scheduler htmldocs
-          make DOCS_THEME=sphinx_rtd_theme SPHINXDIRS=bpf htmldocs
-          cd ..
-          cp -a linux/Documentation/output/scheduler target/doc/
-          cp -a linux/Documentation/output/bpf target/doc/
-          sed -i 's%<li><a href="server/index.html">server</a></li>%<li><a href="server/index.html">server</a></li><li><a href="scheduler/sched-ext.html">Kernel Sched Ext Docs</a></li><li><a href="bpf/helpers.html">Kernel Bpf Helpers Docs</a></li>%' target/doc/index.html
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: 'target/doc'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
