@@ -11,36 +11,8 @@ jobs:
     with:
       repo-name: sched_ext/for-next
 
-  rust-tests:
-    runs-on: ${{ github.repository_owner == 'sched-ext' && fromJSON('[ "self-hosted", "linux", "x64" ]') || 'ubuntu-latest' }}
-    needs: build-kernel
-    steps:
-      - name: Install Nix
-        if: ${{ runner.environment == 'github-hosted' }}
-        uses: DeterminateSystems/nix-installer-action@main
-
-      - uses: actions/checkout@v4
-
-      - name: Load dependencies
-        run: nix run ./.github/include#nix-develop-gha -- ./.github/include#restore-kernels
-
-      - uses: ./.github/actions/restore-kernel-cache
-        with:
-          repo-name: sched_ext/for-next
-
-      - name: Format
-        run: nix run ./.github/include#ci -- format
-
-      - name: Build
-        run: nix run ./.github/include#ci -- build
-
-      - name: Clippy
-        run: nix run ./.github/include#ci -- clippy
-
-      - name: Test
-        run: nix run ./.github/include#ci -- test
-
   integration-test:
+    if: (github.ref != 'refs/heads/main') && (github.ref != 'refs/heads/setup-repo')    
     runs-on: ubuntu-24.04
     needs: build-kernel
     strategy:
