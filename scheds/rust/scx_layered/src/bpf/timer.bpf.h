@@ -4,14 +4,14 @@
 #define __bpf__
 #ifndef LSP_INC
 #include "../../../../include/scx/common.bpf.h"
-#include "timer.bpf.h"
+#include "timer.bpf.h.h"
 #endif
 #endif
 
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
-#include "timer.bpf.h"
+#include "timer.bpf.h.h"
 
 
 struct timer_wrapper {

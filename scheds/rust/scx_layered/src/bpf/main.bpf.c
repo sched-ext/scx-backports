@@ -10,7 +10,7 @@
 #endif
 
 #include "intf.h"
-#include "timer.bpf.h"
+#include "timer.bpf.h.h"
 
 #include <errno.h>
 #include <stdbool.h>
@@ -62,7 +62,7 @@ u32 nr_empty_layer_ids;
 #define dbg(fmt, args...)	do { if (debug) bpf_printk(fmt, ##args); } while (0)
 #define trace(fmt, args...)	do { if (debug > 1) bpf_printk(fmt, ##args); } while (0)
 
-#include "util.bpf.c"
+#include "util.bpf.h"
 
 UEI_DEFINE(uei);
 
@@ -2412,7 +2412,7 @@ struct layered_timer layered_timers[MAX_TIMERS] = {
 };
 
 // TODO: separate this out to a separate compilation unit
-#include "timer.bpf.c"
+#include "timer.bpf.h"
 
 /*
  * Initializes per-layer specific data structures.
