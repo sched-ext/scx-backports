@@ -1,5 +1,5 @@
 /* Copyright (c) Meta Platforms, Inc. and affiliates. */
-#include "cost.bpf.h"
+#include "cost.bpf.h.h"
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
