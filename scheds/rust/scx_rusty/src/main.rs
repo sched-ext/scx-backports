@@ -46,7 +46,7 @@ use libbpf_rs::MapCore as _;
 use libbpf_rs::OpenObject;
 use log::info;
 use scx_stats::prelude::*;
-use scx_utils::build_id;
+// use scx_utils::build_id;
 use scx_utils::compat;
 use scx_utils::import_enums;
 use scx_utils::init_libbpf_logging;
@@ -359,10 +359,10 @@ impl<'a> Scheduler<'a> {
         let mut skel_builder = BpfSkelBuilder::default();
         skel_builder.obj_builder.debug(opts.verbose > 0);
         init_libbpf_logging(None);
-        info!(
-            "Running scx_rusty (build ID: {})",
-            *build_id::SCX_FULL_VERSION
-        );
+        // info!(
+        //     "Running scx_rusty (build ID: {})",
+        //     *build_id::SCX_FULL_VERSION
+        // );
         let mut skel = scx_ops_open!(skel_builder, open_object, rusty).unwrap();
 
         // Initialize skel according to @opts.
@@ -628,7 +628,7 @@ fn main() -> Result<()> {
     let opts = Opts::parse();
 
     if opts.version {
-        println!("scx_rusty: {}", *build_id::SCX_FULL_VERSION);
+        // println!("scx_rusty: {}", *build_id::SCX_FULL_VERSION);
         return Ok(());
     }
 
