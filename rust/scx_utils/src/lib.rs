@@ -35,7 +35,7 @@ pub use paste::paste;
 
 mod clang_info;
 
-mod bindings;
+pub mod bindings;
 
 mod bpf_builder;
 pub use bpf_builder::BpfBuilder;
@@ -52,7 +52,7 @@ pub use user_exit_info::SCX_ECODE_ACT_RESTART;
 pub use user_exit_info::SCX_ECODE_RSN_HOTPLUG;
 pub use user_exit_info::UEI_DUMP_PTR_MUTEX;
 
-pub mod build_id;
+//pub mod build_id;
 pub mod compat;
 
 mod libbpf_logger;
