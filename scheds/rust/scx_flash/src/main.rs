@@ -30,8 +30,7 @@ use libbpf_rs::OpenObject;
 use log::info;
 use log::warn;
 use scx_stats::prelude::*;
-use scx_utils::build_id;
-use scx_utils::compat;
+// use scx_utils::build_id;
 use scx_utils::import_enums;
 use scx_utils::scx_enums;
 use scx_utils::scx_ops_attach;
@@ -107,16 +106,16 @@ impl<'a> Scheduler<'a> {
         let topo = Topology::new().unwrap();
 
         // Check host topology to determine if we need to enable SMT capabilities.
-        info!(
-            "{} {} {}",
-            SCHEDULER_NAME,
-            build_id::full_version(env!("CARGO_PKG_VERSION")),
-            if topo.smt_enabled {
-                "SMT on"
-            } else {
-                "SMT off"
-            }
-        );
+        let smt_enabled = match is_smt_active() {
+            Ok(value) => value == 1,
+            Err(e) => bail!("Failed to read SMT status: {}", e),
+        };
+        // info!(
+        //     "{} {} {}",
+        //     SCHEDULER_NAME,
+        //     *build_id::SCX_FULL_VERSION,
+        //     if smt_enabled { "SMT on" } else { "SMT off" }
+        // );
 
         // Initialize BPF connector.
         let mut skel_builder = BpfSkelBuilder::default();
@@ -198,11 +197,6 @@ fn main() -> Result<()> {
     let opts = Opts::parse();
 
     if opts.version {
-        println!(
-            "{} {}",
-            SCHEDULER_NAME,
-            build_id::full_version(env!("CARGO_PKG_VERSION"))
-        );
         return Ok(());
     }
 
