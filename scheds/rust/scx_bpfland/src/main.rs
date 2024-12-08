@@ -34,7 +34,7 @@ use libbpf_rs::ProgramInput;
 use log::warn;
 use log::{debug, info};
 use scx_stats::prelude::*;
-use scx_utils::build_id;
+// use scx_utils::build_id;
 use scx_utils::import_enums;
 use scx_utils::scx_enums;
 use scx_utils::scx_ops_attach;
@@ -231,12 +231,12 @@ impl<'a> Scheduler<'a> {
             Ok(value) => value == 1,
             Err(e) => bail!("Failed to read SMT status: {}", e),
         };
-        info!(
-            "{} {} {}",
-            SCHEDULER_NAME,
-            *build_id::SCX_FULL_VERSION,
-            if smt_enabled { "SMT on" } else { "SMT off" }
-        );
+        // info!(
+        //     "{} {} {}",
+        //     SCHEDULER_NAME,
+        //     *build_id::SCX_FULL_VERSION,
+        //     if smt_enabled { "SMT on" } else { "SMT off" }
+        // );
 
         // Initialize BPF connector.
         let mut skel_builder = BpfSkelBuilder::default();
@@ -579,7 +579,7 @@ fn main() -> Result<()> {
     let opts = Opts::parse();
 
     if opts.version {
-        println!("{} {}", SCHEDULER_NAME, *build_id::SCX_FULL_VERSION);
+        // println!("{} {}", SCHEDULER_NAME, *build_id::SCX_FULL_VERSION);
         return Ok(());
     }
 
