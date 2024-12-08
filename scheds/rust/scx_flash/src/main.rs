@@ -323,14 +323,16 @@ impl<'a> Scheduler<'a> {
         let topo = Topology::new().unwrap();
 
         // Check host topology to determine if we need to enable SMT capabilities.
-        let smt_enabled = !opts.disable_smt && topo.smt_enabled;
-
-        info!(
-            "{} {} {}",
-            SCHEDULER_NAME,
-            build_id::full_version(env!("CARGO_PKG_VERSION")),
-            if smt_enabled { "SMT on" } else { "SMT off" }
-        );
+        let smt_enabled = match is_smt_active() {
+            Ok(value) => value == 1,
+            Err(e) => bail!("Failed to read SMT status: {}", e),
+        };
+        // info!(
+        //     "{} {} {}",
+        //     SCHEDULER_NAME,
+        //     *build_id::SCX_FULL_VERSION,
+        //     if smt_enabled { "SMT on" } else { "SMT off" }
+        // );
 
         // Print command line.
         info!(
@@ -742,11 +744,6 @@ fn main() -> Result<()> {
     let opts = Opts::parse();
 
     if opts.version {
-        println!(
-            "{} {}",
-            SCHEDULER_NAME,
-            build_id::full_version(env!("CARGO_PKG_VERSION"))
-        );
         return Ok(());
     }
 
