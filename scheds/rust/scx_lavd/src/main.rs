@@ -49,8 +49,7 @@ use log::info;
 use plain::Plain;
 use scx_stats::prelude::*;
 use scx_utils::autopower::{fetch_power_profile, PowerProfile};
-use scx_utils::build_id;
-use scx_utils::compat;
+// use scx_utils::build_id;
 use scx_utils::import_enums;
 use scx_utils::scx_enums;
 use scx_utils::scx_ops_attach;
@@ -929,10 +928,7 @@ fn main() -> Result<()> {
     let mut opts = Opts::parse();
 
     if opts.version {
-        println!(
-            "scx_lavd {}",
-            build_id::full_version(env!("CARGO_PKG_VERSION"))
-        );
+        // println!("scx_lavd {}", *build_id::SCX_FULL_VERSION);
         return Ok(());
     }
 
@@ -982,10 +978,10 @@ fn main() -> Result<()> {
     let mut open_object = MaybeUninit::uninit();
     loop {
         let mut sched = Scheduler::init(&opts, &mut open_object)?;
-        info!(
-            "scx_lavd scheduler is initialized (build ID: {})",
-            build_id::full_version(env!("CARGO_PKG_VERSION"))
-        );
+        // info!(
+        //     "scx_lavd scheduler is initialized (build ID: {})",
+        //     *build_id::SCX_FULL_VERSION
+        // );
         info!("scx_lavd scheduler starts running.");
         if !sched.run(&opts, shutdown.clone())?.should_restart() {
             break;
