@@ -44,6 +44,25 @@ jobs:
       - if: ${{ steps.cache-virtiofsd.outputs.cache-hit != 'true' }}
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
+      # get latest head commit of sched_ext for-next
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=35aacc4" >> $GITHUB_ENV
+
+      # use cached kernel if available, create after job if not
+      - name: Cache Kernel
+        id: cache-kernel
+        uses: actions/cache@v4
+        with:
+          path: |
+            linux/arch/x86/boot/bzImage
+            linux/usr/include
+            linux/**/*.h
+          key: kernel-build-${{ env.SCHED_EXT_KERNEL_COMMIT }}-5
+
+      # need to re-run job when kernel head changes between build and test running.
+      - if: ${{ steps.cache-kernel.outputs.cache-hit != 'true' }}
+        name: exit if cache stale
+        run: exit -1
+
       # veristat
       - run: wget https://github.com/libbpf/veristat/releases/download/v0.3.2/veristat-v0.3.2-amd64.tar.gz
       - run: tar -xvf veristat-v0.3.2-amd64.tar.gz && sudo cp veristat /usr/bin/
