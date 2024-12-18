@@ -26,12 +26,6 @@ jobs:
       - run: cargo fmt
       - run: git diff --exit-code
 
-  build-kernel-nix:
-    uses: ./.github/workflows/build-kernel.yml
-    with:
-      git-repo: "https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git"
-      branch: for-6.13
-
   build-kernel:
     if: (github.ref != 'refs/heads/main') && (github.ref != 'refs/heads/setup-repo')
     runs-on: ubuntu-24.04
@@ -42,7 +36,8 @@ jobs:
       - run: echo 'debconf debconf/frontend select Noninteractive' | sudo debconf-set-selections
       - run: sudo apt-get update
       - run: sudo apt-get install -y git --no-install-recommends
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=$(git ls-remote https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git heads/for-6.13 | awk '{print $1}')" >> $GITHUB_ENV
+      # get latest head commit of sched_ext for-next
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=35aacc4" >> $GITHUB_ENV
 
       - uses: actions/checkout@v4
 
@@ -122,7 +117,8 @@ jobs:
       - if: ${{ steps.cache-virtiofsd.outputs.cache-hit != 'true' }}
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
 
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=$(git ls-remote https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git heads/for-6.13 | awk '{print $1}')" >> $GITHUB_ENV
+      # get latest head commit of sched_ext for-next
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=35aacc4" >> $GITHUB_ENV
 
       # use cached kernel if available, create after job if not
       - name: Cache Kernel
