@@ -24,11 +24,6 @@ jobs:
       - run: git diff --exit-code
 
   build-kernel:
-    uses: ./.github/workflows/build-kernel.yml
-    with:
-      repo-name: sched_ext/for-next
-
-  build-kernel:
     if: (github.ref != 'refs/heads/main') && (github.ref != 'refs/heads/setup-repo')
     runs-on: ubuntu-24.04
     steps:
@@ -38,7 +33,8 @@ jobs:
       - run: echo 'debconf debconf/frontend select Noninteractive' | sudo debconf-set-selections
       - run: sudo apt-get update
       - run: sudo apt-get install -y git --no-install-recommends
-      - run: echo "SCHED_EXT_KERNEL_COMMIT=$(git ls-remote https://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git heads/for-6.13 | awk '{print $1}')" >> $GITHUB_ENV
+      # get latest head commit of sched_ext for-next
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=35aacc4" >> $GITHUB_ENV
 
       - uses: actions/checkout@v4
 
@@ -122,6 +118,25 @@ jobs:
           key: virtiofsd-binary
       - if: ${{ steps.cache-virtiofsd.outputs.cache-hit != 'true' }}
         run: cargo install virtiofsd && sudo cp -a ~/.cargo/bin/virtiofsd /usr/lib/
+
+      # get latest head commit of sched_ext for-next
+      - run: echo "SCHED_EXT_KERNEL_COMMIT=35aacc4" >> $GITHUB_ENV
+
+      # use cached kernel if available, create after job if not
+      - name: Cache Kernel
+        id: cache-kernel
+        uses: actions/cache@v4
+        with:
+          path: |
+            linux/arch/x86/boot/bzImage
+            linux/usr/include
+            linux/**/*.h
+          key: kernel-build-${{ env.SCHED_EXT_KERNEL_COMMIT }}-5
+
+      # need to re-run job when kernel head changes between build and test running.
+      - if: ${{ steps.cache-kernel.outputs.cache-hit != 'true' }}
+        name: exit if cache stale
+        run: exit -1
 
       # veristat
       - run: wget https://github.com/libbpf/veristat/releases/download/v0.3.2/veristat-v0.3.2-amd64.tar.gz
