@@ -170,6 +170,7 @@ struct cpu_ctx {
 	bool			running_open;
 	bool			running_fallback;
 	u64			running_at;
+	bool			protected;
 
 	u64			layer_usages[MAX_LAYERS][NR_LAYER_USAGES];
 	u64			gstats[NR_GSTATS];
@@ -324,6 +325,7 @@ struct layer {
 	u32			llc_drain_cnt;
 
 	char			name[MAX_LAYER_NAME];
+	bool			protected;
 };
 
 struct scx_cmd {
