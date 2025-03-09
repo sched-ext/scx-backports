@@ -51,7 +51,8 @@ enum stat_idx {
 	P2DQ_STAT_LLC_MIGRATION,
 	P2DQ_STAT_NODE_MIGRATION,
 	P2DQ_STAT_KEEP,
-	P2DQ_STAT_PICK2,
+	P2DQ_STAT_SELECT_PICK2,
+	P2DQ_STAT_DISPATCH_PICK2,
 	P2DQ_NR_STATS,
 };
 
@@ -77,6 +78,7 @@ struct task_ctx {
 	u64			last_dsq_id;
 	int			last_dsq_index;
 	u64 			last_run_at;
+	u64			llc_runs; /* how many runs on the current LLC */
 
 	/* The task is a workqueue worker thread */
 	bool			is_kworker;

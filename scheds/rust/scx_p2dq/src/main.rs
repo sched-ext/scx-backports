@@ -9,7 +9,6 @@ pub mod stats;
 use stats::Metrics;
 
 use std::mem::MaybeUninit;
-use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -29,7 +28,6 @@ use scx_stats::prelude::*;
 use scx_utils::build_id;
 use scx_utils::import_enums;
 use scx_utils::init_libbpf_logging;
-use scx_utils::misc::read_file_usize;
 use scx_utils::scx_enums;
 use scx_utils::scx_ops_attach;
 use scx_utils::scx_ops_load;
@@ -43,6 +41,7 @@ use scx_utils::NR_CPU_IDS;
 
 use crate::bpf_intf::stat_idx_P2DQ_NR_STATS;
 use crate::bpf_intf::stat_idx_P2DQ_STAT_DIRECT;
+use crate::bpf_intf::stat_idx_P2DQ_STAT_DISPATCH_PICK2;
 use crate::bpf_intf::stat_idx_P2DQ_STAT_DSQ_CHANGE;
 use crate::bpf_intf::stat_idx_P2DQ_STAT_DSQ_SAME;
 use crate::bpf_intf::stat_idx_P2DQ_STAT_GREEDY_IDLE;
@@ -50,7 +49,25 @@ use crate::bpf_intf::stat_idx_P2DQ_STAT_IDLE;
 use crate::bpf_intf::stat_idx_P2DQ_STAT_KEEP;
 use crate::bpf_intf::stat_idx_P2DQ_STAT_LLC_MIGRATION;
 use crate::bpf_intf::stat_idx_P2DQ_STAT_NODE_MIGRATION;
-use crate::bpf_intf::stat_idx_P2DQ_STAT_PICK2;
+use crate::bpf_intf::stat_idx_P2DQ_STAT_SELECT_PICK2;
+
+lazy_static::lazy_static! {
+        pub static ref TOPO: Topology = Topology::new().unwrap();
+}
+
+fn get_default_pick2_nr_queued() -> u32 {
+    let max_llc_cpus = TOPO
+        .all_llcs
+        .values()
+        .map(|llc| llc.cores.len())
+        .max()
+        .unwrap_or(1) as u32;
+    if max_llc_cpus > 1 {
+        max_llc_cpus / 2
+    } else {
+        max_llc_cpus
+    }
+}
 
 /// scx_p2dq: A pick 2 dumb queuing load balancing scheduler.
 ///
@@ -83,13 +100,26 @@ struct Opts {
     #[clap(short = 'y', long, action = clap::ArgAction::SetTrue)]
     interactive_sticky: bool,
 
+    /// Disables pick2 load balancing on the dispatch path.
+    #[clap(short = 'd', long, action = clap::ArgAction::SetTrue)]
+    dispatch_pick2_disable: bool,
+
     /// Enable tasks to run beyond their timeslice if the CPU is idle.
     #[clap(long, action = clap::ArgAction::SetTrue)]
     keep_running: bool,
 
+    /// Only pick2 load balance from the max DSQ.
+    #[clap(long, action = clap::ArgAction::SetTrue)]
+    max_dsq_pick2: bool,
+
     /// Scheduling min slice duration in microseconds.
     #[clap(short = 's', long, default_value = "100")]
     min_slice_us: u64,
+
+    /// Number of runs on the LLC before a task becomes eligbile for pick2 migration on the wakeup
+    /// path.
+    #[clap(short = 'l', long, default_value = "3")]
+    min_llc_runs_pick2: u64,
 
     /// Manual definition of slice intervals in microseconds for DSQs, must be equal to number of
     /// dumb_queues.
@@ -99,6 +129,10 @@ struct Opts {
     /// DSQ scaling shift, each queue min timeslice is shifted by the scaling shift.
     #[clap(short = 'x', long, default_value = "4")]
     dsq_shift: u64,
+
+    /// Minimum number of queued tasks to use pick2 balancing, 0 to always enabled.
+    #[clap(short = 'm', long, default_value_t = get_default_pick2_nr_queued())]
+    min_nr_queued_pick2: u32,
 
     /// Number of dumb DSQs.
     #[clap(short = 'q', long, default_value = "3")]
@@ -155,7 +189,6 @@ impl<'a> Scheduler<'a> {
         );
         let mut skel = scx_ops_open!(skel_builder, open_object, p2dq).unwrap();
 
-        let topo = Topology::new()?;
         if opts.init_dsq_index > opts.dumb_queues - 1 {
             panic!("Invalid init_dsq_index {}", opts.init_dsq_index);
         }
@@ -193,28 +226,32 @@ impl<'a> Scheduler<'a> {
             }
         }
 
-        skel.maps.rodata_data.autoslice = opts.autoslice;
         skel.maps.rodata_data.interactive_ratio = opts.interactive_ratio as u32;
         skel.maps.rodata_data.min_slice_us = opts.min_slice_us;
+        skel.maps.rodata_data.min_nr_queued_pick2 = opts.min_nr_queued_pick2;
+        skel.maps.rodata_data.min_llc_runs_pick2 = opts.min_llc_runs_pick2;
         skel.maps.rodata_data.dsq_shift = opts.dsq_shift as u64;
         skel.maps.rodata_data.kthreads_local = !opts.disable_kthreads_local;
-        skel.maps.rodata_data.debug = opts.verbose as u32;
         skel.maps.rodata_data.nr_cpus = *NR_CPU_IDS as u32;
         skel.maps.rodata_data.nr_dsqs_per_llc = opts.dumb_queues as u32;
         skel.maps.rodata_data.init_dsq_index = opts.init_dsq_index as i32;
-        skel.maps.rodata_data.nr_llcs = topo.all_llcs.clone().keys().len() as u32;
-        skel.maps.rodata_data.nr_nodes = topo.nodes.clone().keys().len() as u32;
+        skel.maps.rodata_data.nr_llcs = TOPO.all_llcs.clone().keys().len() as u32;
+        skel.maps.rodata_data.nr_nodes = TOPO.nodes.clone().keys().len() as u32;
+
+        skel.maps.rodata_data.autoslice = opts.autoslice;
+        skel.maps.rodata_data.debug = opts.verbose as u32;
+        skel.maps.rodata_data.dispatch_pick2_disable = opts.dispatch_pick2_disable;
         skel.maps.rodata_data.eager_load_balance = !opts.eager_load_balance;
         skel.maps.rodata_data.greedy_idle = !opts.greedy_idle_disable;
-        skel.maps.rodata_data.has_little_cores = topo.has_little_cores();
+        skel.maps.rodata_data.has_little_cores = TOPO.has_little_cores();
         skel.maps.rodata_data.interactive_sticky = opts.interactive_sticky;
         skel.maps.rodata_data.keep_running_enabled = opts.keep_running;
-        skel.maps.rodata_data.smt_enabled =
-            read_file_usize(Path::new("/sys/devices/system/cpu/smt/active")).unwrap_or(0) == 1;
+        skel.maps.rodata_data.max_dsq_pick2 = opts.max_dsq_pick2;
+        skel.maps.rodata_data.smt_enabled = TOPO.smt_enabled;
 
         let mut skel = scx_ops_load!(skel, p2dq, uei)?;
 
-        for cpu in topo.all_cpus.values() {
+        for cpu in TOPO.all_cpus.values() {
             skel.maps.bss_data.big_core_ids[cpu.id] =
                 if cpu.core_type == (CoreType::Big { turbo: true }) {
                     1
@@ -260,7 +297,8 @@ impl<'a> Scheduler<'a> {
             dsq_change: stats[stat_idx_P2DQ_STAT_DSQ_CHANGE as usize],
             same_dsq: stats[stat_idx_P2DQ_STAT_DSQ_SAME as usize],
             keep: stats[stat_idx_P2DQ_STAT_KEEP as usize],
-            pick2: stats[stat_idx_P2DQ_STAT_PICK2 as usize],
+            select_pick2: stats[stat_idx_P2DQ_STAT_SELECT_PICK2 as usize],
+            dispatch_pick2: stats[stat_idx_P2DQ_STAT_DISPATCH_PICK2 as usize],
             llc_migrations: stats[stat_idx_P2DQ_STAT_LLC_MIGRATION as usize],
             node_migrations: stats[stat_idx_P2DQ_STAT_NODE_MIGRATION as usize],
         }
