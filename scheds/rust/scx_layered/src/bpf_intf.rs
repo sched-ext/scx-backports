@@ -153,7 +153,7 @@ pub struct cpu_ctx {
     pub running_open: bool,
     pub running_fallback: bool,
     pub running_at: u64_,
-    pub protected: bool,
+    pub is_protected: bool,
     pub layer_usages: [[u64_; 4usize]; 16usize],
     pub gstats: [u64_; 8usize],
     pub lstats: [[u64_; 30usize]; 16usize],
@@ -206,7 +206,8 @@ const _: () = {
     ["Offset of field: cpu_ctx::running_fallback"]
         [::std::mem::offset_of!(cpu_ctx, running_fallback) - 15usize];
     ["Offset of field: cpu_ctx::running_at"][::std::mem::offset_of!(cpu_ctx, running_at) - 16usize];
-    ["Offset of field: cpu_ctx::protected"][::std::mem::offset_of!(cpu_ctx, protected) - 24usize];
+    ["Offset of field: cpu_ctx::is_protected"]
+        [::std::mem::offset_of!(cpu_ctx, is_protected) - 24usize];
     ["Offset of field: cpu_ctx::layer_usages"]
         [::std::mem::offset_of!(cpu_ctx, layer_usages) - 32usize];
     ["Offset of field: cpu_ctx::gstats"][::std::mem::offset_of!(cpu_ctx, gstats) - 544usize];
@@ -401,7 +402,8 @@ pub const layer_growth_algo_GROWTH_ALGO_ROUND_ROBIN: layer_growth_algo = 5;
 pub const layer_growth_algo_GROWTH_ALGO_BIG_LITTLE: layer_growth_algo = 6;
 pub const layer_growth_algo_GROWTH_ALGO_LITTLE_BIG: layer_growth_algo = 7;
 pub const layer_growth_algo_GROWTH_ALGO_NODE_SPREAD: layer_growth_algo = 8;
-pub const layer_growth_algo_GROWTH_ALGO_RANDOM_TOPO: layer_growth_algo = 9;
+pub const layer_growth_algo_GROWTH_ALGO_NODE_SPREAD_REVERSE: layer_growth_algo = 9;
+pub const layer_growth_algo_GROWTH_ALGO_RANDOM_TOPO: layer_growth_algo = 10;
 pub type layer_growth_algo = ::std::os::raw::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -437,7 +439,7 @@ pub struct layer {
     pub llcs_to_drain: u64_,
     pub llc_drain_cnt: u32_,
     pub name: [::std::os::raw::c_char; 64usize],
-    pub protected: bool,
+    pub is_protected: bool,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
@@ -489,7 +491,8 @@ const _: () = {
     ["Offset of field: layer::llc_drain_cnt"]
         [::std::mem::offset_of!(layer, llc_drain_cnt) - 2406104usize];
     ["Offset of field: layer::name"][::std::mem::offset_of!(layer, name) - 2406108usize];
-    ["Offset of field: layer::protected"][::std::mem::offset_of!(layer, protected) - 2406172usize];
+    ["Offset of field: layer::is_protected"]
+        [::std::mem::offset_of!(layer, is_protected) - 2406172usize];
 };
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
