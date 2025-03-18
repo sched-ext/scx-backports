@@ -25,7 +25,7 @@ use libbpf_rs::MapCore as _;
 use libbpf_rs::OpenObject;
 use log::{debug, info, warn};
 use scx_stats::prelude::*;
-use scx_utils::build_id;
+// use scx_utils::build_id;
 use scx_utils::import_enums;
 use scx_utils::init_libbpf_logging;
 use scx_utils::pm::{cpu_idle_resume_latency_supported, update_cpu_idle_resume_latency};
@@ -191,10 +191,10 @@ impl<'a> Scheduler<'a> {
         let mut skel_builder = BpfSkelBuilder::default();
         skel_builder.obj_builder.debug(opts.verbose > 1);
         init_libbpf_logging(None);
-        info!(
-            "Running scx_p2dq (build ID: {})",
-            build_id::full_version(env!("CARGO_PKG_VERSION"))
-        );
+       // info!(
+       //     "Running scx_p2dq (build ID: {})",
+       //     build_id::full_version(env!("CARGO_PKG_VERSION"))
+       // );
         let mut skel = scx_ops_open!(skel_builder, open_object, p2dq).unwrap();
 
         if opts.init_dsq_index > opts.dumb_queues - 1 {
@@ -343,10 +343,10 @@ fn main() -> Result<()> {
     let opts = Opts::parse();
 
     if opts.version {
-        println!(
-            "scx_p2dq: {}",
-            build_id::full_version(env!("CARGO_PKG_VERSION"))
-        );
+        //println!(
+        //    "scx_p2dq: {}",
+        //    build_id::full_version(env!("CARGO_PKG_VERSION"))
+        //);
         return Ok(());
     }
 
