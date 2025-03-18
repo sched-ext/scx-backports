@@ -183,10 +183,10 @@ impl<'a> Scheduler<'a> {
         let mut skel_builder = BpfSkelBuilder::default();
         skel_builder.obj_builder.debug(opts.verbose > 1);
         init_libbpf_logging(None);
-        info!(
-            "Running scx_p2dq (build ID: {})",
-            build_id::full_version(env!("CARGO_PKG_VERSION"))
-        );
+       // info!(
+       //     "Running scx_p2dq (build ID: {})",
+       //     build_id::full_version(env!("CARGO_PKG_VERSION"))
+       // );
         let mut skel = scx_ops_open!(skel_builder, open_object, p2dq).unwrap();
 
         if opts.init_dsq_index > opts.dumb_queues - 1 {
@@ -339,10 +339,10 @@ fn main() -> Result<()> {
     let opts = Opts::parse();
 
     if opts.version {
-        println!(
-            "scx_p2dq: {}",
-            build_id::full_version(env!("CARGO_PKG_VERSION"))
-        );
+        //println!(
+        //    "scx_p2dq: {}",
+        //    build_id::full_version(env!("CARGO_PKG_VERSION"))
+        //);
         return Ok(());
     }
 
