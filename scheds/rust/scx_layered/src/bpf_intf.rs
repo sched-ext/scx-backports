@@ -348,6 +348,7 @@ pub struct layer_match {
     pub is_kthread: bool,
     pub used_gpu_tid: bool,
     pub used_gpu_pid: bool,
+    pub exclude: bool,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
@@ -377,6 +378,8 @@ const _: () = {
         [::std::mem::offset_of!(layer_match, used_gpu_tid) - 4170usize];
     ["Offset of field: layer_match::used_gpu_pid"]
         [::std::mem::offset_of!(layer_match, used_gpu_pid) - 4171usize];
+    ["Offset of field: layer_match::exclude"]
+        [::std::mem::offset_of!(layer_match, exclude) - 4172usize];
 };
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -404,6 +407,7 @@ pub const layer_growth_algo_GROWTH_ALGO_LITTLE_BIG: layer_growth_algo = 7;
 pub const layer_growth_algo_GROWTH_ALGO_NODE_SPREAD: layer_growth_algo = 8;
 pub const layer_growth_algo_GROWTH_ALGO_NODE_SPREAD_REVERSE: layer_growth_algo = 9;
 pub const layer_growth_algo_GROWTH_ALGO_RANDOM_TOPO: layer_growth_algo = 10;
+pub const layer_growth_algo_GROWTH_ALGO_STICKY_DYNAMIC: layer_growth_algo = 11;
 pub type layer_growth_algo = ::std::os::raw::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
