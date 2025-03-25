@@ -30,7 +30,7 @@ use log::warn;
 use log::{debug, info};
 use scx_stats::prelude::*;
 use scx_utils::autopower::{fetch_power_profile, PowerProfile};
-use scx_utils::build_id;
+// use scx_utils::build_id;
 use scx_utils::compat;
 use scx_utils::pm::{cpu_idle_resume_latency_supported, update_cpu_idle_resume_latency};
 use scx_utils::scx_ops_attach;
