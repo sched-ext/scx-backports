@@ -44,7 +44,7 @@ use libbpf_rs::OpenObject;
 use libbpf_rs::ProgramInput;
 use log::info;
 use scx_stats::prelude::*;
-use scx_utils::build_id;
+//use scx_utils::build_id;
 use scx_utils::compat;
 use scx_utils::init_libbpf_logging;
 use scx_utils::scx_enums;
