@@ -82,11 +82,11 @@ pub const layer_stat_id_LSTAT_ENQ_LOCAL: layer_stat_id = 1;
 pub const layer_stat_id_LSTAT_ENQ_WAKEUP: layer_stat_id = 2;
 pub const layer_stat_id_LSTAT_ENQ_EXPIRE: layer_stat_id = 3;
 pub const layer_stat_id_LSTAT_ENQ_REENQ: layer_stat_id = 4;
-pub const layer_stat_id_LSTAT_MIN_EXEC: layer_stat_id = 5;
-pub const layer_stat_id_LSTAT_MIN_EXEC_NS: layer_stat_id = 6;
-pub const layer_stat_id_LSTAT_OPEN_IDLE: layer_stat_id = 7;
-pub const layer_stat_id_LSTAT_AFFN_VIOL: layer_stat_id = 8;
-pub const layer_stat_id_LSTAT_KEEP: layer_stat_id = 9;
+pub const layer_stat_id_LSTAT_KEEP: layer_stat_id = 5;
+pub const layer_stat_id_LSTAT_MIN_EXEC: layer_stat_id = 6;
+pub const layer_stat_id_LSTAT_MIN_EXEC_NS: layer_stat_id = 7;
+pub const layer_stat_id_LSTAT_OPEN_IDLE: layer_stat_id = 8;
+pub const layer_stat_id_LSTAT_AFFN_VIOL: layer_stat_id = 9;
 pub const layer_stat_id_LSTAT_KEEP_FAIL_MAX_EXEC: layer_stat_id = 10;
 pub const layer_stat_id_LSTAT_KEEP_FAIL_BUSY: layer_stat_id = 11;
 pub const layer_stat_id_LSTAT_PREEMPT: layer_stat_id = 12;
@@ -152,7 +152,7 @@ pub struct cpu_ctx {
     pub running_owned: bool,
     pub running_open: bool,
     pub running_fallback: bool,
-    pub running_at: u64_,
+    pub used_at: u64_,
     pub is_protected: bool,
     pub layer_usages: [[u64_; 4usize]; 16usize],
     pub gstats: [u64_; 8usize],
@@ -205,7 +205,7 @@ const _: () = {
         [::std::mem::offset_of!(cpu_ctx, running_open) - 14usize];
     ["Offset of field: cpu_ctx::running_fallback"]
         [::std::mem::offset_of!(cpu_ctx, running_fallback) - 15usize];
-    ["Offset of field: cpu_ctx::running_at"][::std::mem::offset_of!(cpu_ctx, running_at) - 16usize];
+    ["Offset of field: cpu_ctx::used_at"][::std::mem::offset_of!(cpu_ctx, used_at) - 16usize];
     ["Offset of field: cpu_ctx::is_protected"]
         [::std::mem::offset_of!(cpu_ctx, is_protected) - 24usize];
     ["Offset of field: cpu_ctx::layer_usages"]
@@ -406,8 +406,9 @@ pub const layer_growth_algo_GROWTH_ALGO_BIG_LITTLE: layer_growth_algo = 6;
 pub const layer_growth_algo_GROWTH_ALGO_LITTLE_BIG: layer_growth_algo = 7;
 pub const layer_growth_algo_GROWTH_ALGO_NODE_SPREAD: layer_growth_algo = 8;
 pub const layer_growth_algo_GROWTH_ALGO_NODE_SPREAD_REVERSE: layer_growth_algo = 9;
-pub const layer_growth_algo_GROWTH_ALGO_RANDOM_TOPO: layer_growth_algo = 10;
-pub const layer_growth_algo_GROWTH_ALGO_STICKY_DYNAMIC: layer_growth_algo = 11;
+pub const layer_growth_algo_GROWTH_ALGO_NODE_SPREAD_RANDOM: layer_growth_algo = 10;
+pub const layer_growth_algo_GROWTH_ALGO_RANDOM_TOPO: layer_growth_algo = 11;
+pub const layer_growth_algo_GROWTH_ALGO_STICKY_DYNAMIC: layer_growth_algo = 12;
 pub type layer_growth_algo = ::std::os::raw::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -429,6 +430,7 @@ pub struct layer {
     pub preempt_first: bool,
     pub exclusive: bool,
     pub allow_node_aligned: bool,
+    pub prev_over_idle_core: bool,
     pub growth_algo: ::std::os::raw::c_int,
     pub nr_tasks: u64_,
     pub cpus_seq: u64_,
@@ -475,8 +477,10 @@ const _: () = {
     ["Offset of field: layer::exclusive"][::std::mem::offset_of!(layer, exclusive) - 2405710usize];
     ["Offset of field: layer::allow_node_aligned"]
         [::std::mem::offset_of!(layer, allow_node_aligned) - 2405711usize];
+    ["Offset of field: layer::prev_over_idle_core"]
+        [::std::mem::offset_of!(layer, prev_over_idle_core) - 2405712usize];
     ["Offset of field: layer::growth_algo"]
-        [::std::mem::offset_of!(layer, growth_algo) - 2405712usize];
+        [::std::mem::offset_of!(layer, growth_algo) - 2405716usize];
     ["Offset of field: layer::nr_tasks"][::std::mem::offset_of!(layer, nr_tasks) - 2405720usize];
     ["Offset of field: layer::cpus_seq"][::std::mem::offset_of!(layer, cpus_seq) - 2405728usize];
     ["Offset of field: layer::node_mask"][::std::mem::offset_of!(layer, node_mask) - 2405736usize];
