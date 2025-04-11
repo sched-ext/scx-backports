@@ -123,12 +123,12 @@ impl<'a> Scheduler<'a> {
         // Initialize CPU topology.
         let topo = Topology::new().unwrap();
         let smt_enabled = !opts.nosmt && topo.smt_enabled;
-        info!(
-            "{} {} {}",
-            SCHEDULER_NAME,
-            build_id::full_version(env!("CARGO_PKG_VERSION")),
-            if smt_enabled { "SMT on" } else { "SMT off" }
-        );
+        //info!(
+        //    "{} {} {}",
+        //    SCHEDULER_NAME,
+        //    build_id::full_version(env!("CARGO_PKG_VERSION")),
+        //    if smt_enabled { "SMT on" } else { "SMT off" }
+        //);
 
         // Check if nohz_full is enabled.
         if !is_nohz_enabled() {
@@ -264,14 +264,14 @@ impl Drop for Scheduler<'_> {
 fn main() -> Result<()> {
     let opts = Opts::parse();
 
-    if opts.version {
-        println!(
-            "{} {}",
-            SCHEDULER_NAME,
-            build_id::full_version(env!("CARGO_PKG_VERSION"))
-        );
-        return Ok(());
-    }
+    //if opts.version {
+    //    println!(
+    //        "{} {}",
+    //        SCHEDULER_NAME,
+    //        build_id::full_version(env!("CARGO_PKG_VERSION"))
+    //    );
+    //    return Ok(());
+    //}
 
     if opts.help_stats {
         stats::server_data().describe_meta(&mut std::io::stdout(), None)?;
