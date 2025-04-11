@@ -97,10 +97,10 @@ impl<'a> Scheduler<'a> {
         let mut skel_builder = BpfSkelBuilder::default();
         skel_builder.obj_builder.debug(verbose > 1);
         init_libbpf_logging(None);
-        info!(
-            "Running scx_p2dq (build ID: {})",
-            build_id::full_version(env!("CARGO_PKG_VERSION"))
-        );
+        //info!(
+        //    "Running scx_p2dq (build ID: {})",
+        //    build_id::full_version(env!("CARGO_PKG_VERSION"))
+        //);
         let mut open_skel = scx_ops_open!(skel_builder, open_object, p2dq).unwrap();
         scx_p2dq::init_open_skel!(&mut open_skel, opts, verbose)?;
 
@@ -183,13 +183,13 @@ impl Drop for Scheduler<'_> {
 fn main() -> Result<()> {
     let opts = CliOpts::parse();
 
-    if opts.version {
-        println!(
-            "scx_p2dq: {}",
-            build_id::full_version(env!("CARGO_PKG_VERSION"))
-        );
-        return Ok(());
-    }
+    //if opts.version {
+    //    println!(
+    //        "scx_p2dq: {}",
+    //        build_id::full_version(env!("CARGO_PKG_VERSION"))
+    //    );
+    //    return Ok(());
+    //}
 
     let llv = match opts.verbose {
         0 => simplelog::LevelFilter::Info,
