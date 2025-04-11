@@ -102,10 +102,7 @@ impl<'a> Scheduler<'a> {
         let topo = Topology::new().unwrap();
 
         // Check host topology to determine if we need to enable SMT capabilities.
-        let smt_enabled = match is_smt_active() {
-            Ok(value) => value == 1,
-            Err(e) => bail!("Failed to read SMT status: {}", e),
-        };
+
         // info!(
         //     "{} {} {}",
         //     SCHEDULER_NAME,
