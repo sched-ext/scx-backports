@@ -1906,6 +1906,8 @@ void BPF_STRUCT_OPS(layered_dispatch, s32 cpu, struct task_struct *prev)
 	u32 nr_ogp_layers = nr_op_layers + nr_gp_layers;
 	u32 nr_ogn_layers = nr_on_layers + nr_gn_layers;
 
+	maybe_refresh_layer_cpumasks();
+
 	if (!(cpuc = lookup_cpu_ctx(-1)))
 		return;
 
