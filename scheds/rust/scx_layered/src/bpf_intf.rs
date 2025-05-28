@@ -4,13 +4,6 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
-pub const __GENTOO_NOT_FREESTANDING: u32 = 1;
-pub const _STDC_PREDEF_H: u32 = 1;
-pub const __STDC_IEC_559__: u32 = 1;
-pub const __STDC_IEC_60559_BFP__: u32 = 201404;
-pub const __STDC_IEC_559_COMPLEX__: u32 = 1;
-pub const __STDC_IEC_60559_COMPLEX__: u32 = 201404;
-pub const __STDC_ISO_10646__: u32 = 201706;
 pub const __bool_true_false_are_defined: u32 = 1;
 pub const true_: u32 = 1;
 pub const false_: u32 = 0;
@@ -30,7 +23,7 @@ pub const consts_MAX_NUMA_NODES: consts = 64;
 pub const consts_MAX_LLCS: consts = 64;
 pub const consts_MAX_COMM: consts = 16;
 pub const consts_MAX_LAYER_MATCH_ORS: consts = 32;
-pub const consts_MAX_LAYER_NAME: consts = 64;
+pub const consts_MAX_LAYER_NAME: consts = 128;
 pub const consts_MAX_LAYERS: consts = 16;
 pub const consts_MAX_LAYER_WEIGHT: consts = 10000;
 pub const consts_MIN_LAYER_WEIGHT: consts = 1;
@@ -143,9 +136,9 @@ const _: () = {
 pub struct cpu_ctx {
     pub cpu: s32,
     pub current_preempt: bool,
-    pub current_exclusive: bool,
-    pub prev_exclusive: bool,
-    pub maybe_idle: bool,
+    pub current_excl: bool,
+    pub prev_excl: bool,
+    pub next_excl: bool,
     pub yielding: bool,
     pub try_preempt_first: bool,
     pub is_big: bool,
@@ -188,11 +181,10 @@ const _: () = {
     ["Offset of field: cpu_ctx::cpu"][::std::mem::offset_of!(cpu_ctx, cpu) - 0usize];
     ["Offset of field: cpu_ctx::current_preempt"]
         [::std::mem::offset_of!(cpu_ctx, current_preempt) - 4usize];
-    ["Offset of field: cpu_ctx::current_exclusive"]
-        [::std::mem::offset_of!(cpu_ctx, current_exclusive) - 5usize];
-    ["Offset of field: cpu_ctx::prev_exclusive"]
-        [::std::mem::offset_of!(cpu_ctx, prev_exclusive) - 6usize];
-    ["Offset of field: cpu_ctx::maybe_idle"][::std::mem::offset_of!(cpu_ctx, maybe_idle) - 7usize];
+    ["Offset of field: cpu_ctx::current_excl"]
+        [::std::mem::offset_of!(cpu_ctx, current_excl) - 5usize];
+    ["Offset of field: cpu_ctx::prev_excl"][::std::mem::offset_of!(cpu_ctx, prev_excl) - 6usize];
+    ["Offset of field: cpu_ctx::next_excl"][::std::mem::offset_of!(cpu_ctx, next_excl) - 7usize];
     ["Offset of field: cpu_ctx::yielding"][::std::mem::offset_of!(cpu_ctx, yielding) - 8usize];
     ["Offset of field: cpu_ctx::try_preempt_first"]
         [::std::mem::offset_of!(cpu_ctx, try_preempt_first) - 9usize];
@@ -332,7 +324,8 @@ pub const layer_match_kind_MATCH_USED_GPU_TID: layer_match_kind = 16;
 pub const layer_match_kind_MATCH_USED_GPU_PID: layer_match_kind = 17;
 pub const layer_match_kind_MATCH_AVG_RUNTIME: layer_match_kind = 18;
 pub const layer_match_kind_MATCH_CGROUP_SUFFIX: layer_match_kind = 19;
-pub const layer_match_kind_NR_LAYER_MATCH_KINDS: layer_match_kind = 20;
+pub const layer_match_kind_MATCH_CGROUP_CONTAINS: layer_match_kind = 20;
+pub const layer_match_kind_NR_LAYER_MATCH_KINDS: layer_match_kind = 21;
 pub type layer_match_kind = ::std::os::raw::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -340,6 +333,7 @@ pub struct layer_match {
     pub kind: ::std::os::raw::c_int,
     pub cgroup_prefix: [::std::os::raw::c_char; 4096usize],
     pub cgroup_suffix: [::std::os::raw::c_char; 4096usize],
+    pub cgroup_substr: [::std::os::raw::c_char; 4096usize],
     pub comm_prefix: [::std::os::raw::c_char; 16usize],
     pub pcomm_prefix: [::std::os::raw::c_char; 16usize],
     pub nice: ::std::os::raw::c_int,
@@ -359,55 +353,57 @@ pub struct layer_match {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of layer_match"][::std::mem::size_of::<layer_match>() - 8288usize];
+    ["Size of layer_match"][::std::mem::size_of::<layer_match>() - 12384usize];
     ["Alignment of layer_match"][::std::mem::align_of::<layer_match>() - 8usize];
     ["Offset of field: layer_match::kind"][::std::mem::offset_of!(layer_match, kind) - 0usize];
     ["Offset of field: layer_match::cgroup_prefix"]
         [::std::mem::offset_of!(layer_match, cgroup_prefix) - 4usize];
     ["Offset of field: layer_match::cgroup_suffix"]
         [::std::mem::offset_of!(layer_match, cgroup_suffix) - 4100usize];
+    ["Offset of field: layer_match::cgroup_substr"]
+        [::std::mem::offset_of!(layer_match, cgroup_substr) - 8196usize];
     ["Offset of field: layer_match::comm_prefix"]
-        [::std::mem::offset_of!(layer_match, comm_prefix) - 8196usize];
+        [::std::mem::offset_of!(layer_match, comm_prefix) - 12292usize];
     ["Offset of field: layer_match::pcomm_prefix"]
-        [::std::mem::offset_of!(layer_match, pcomm_prefix) - 8212usize];
-    ["Offset of field: layer_match::nice"][::std::mem::offset_of!(layer_match, nice) - 8228usize];
+        [::std::mem::offset_of!(layer_match, pcomm_prefix) - 12308usize];
+    ["Offset of field: layer_match::nice"][::std::mem::offset_of!(layer_match, nice) - 12324usize];
     ["Offset of field: layer_match::user_id"]
-        [::std::mem::offset_of!(layer_match, user_id) - 8232usize];
+        [::std::mem::offset_of!(layer_match, user_id) - 12328usize];
     ["Offset of field: layer_match::group_id"]
-        [::std::mem::offset_of!(layer_match, group_id) - 8236usize];
-    ["Offset of field: layer_match::pid"][::std::mem::offset_of!(layer_match, pid) - 8240usize];
-    ["Offset of field: layer_match::ppid"][::std::mem::offset_of!(layer_match, ppid) - 8244usize];
-    ["Offset of field: layer_match::tgid"][::std::mem::offset_of!(layer_match, tgid) - 8248usize];
-    ["Offset of field: layer_match::nsid"][::std::mem::offset_of!(layer_match, nsid) - 8256usize];
+        [::std::mem::offset_of!(layer_match, group_id) - 12332usize];
+    ["Offset of field: layer_match::pid"][::std::mem::offset_of!(layer_match, pid) - 12336usize];
+    ["Offset of field: layer_match::ppid"][::std::mem::offset_of!(layer_match, ppid) - 12340usize];
+    ["Offset of field: layer_match::tgid"][::std::mem::offset_of!(layer_match, tgid) - 12344usize];
+    ["Offset of field: layer_match::nsid"][::std::mem::offset_of!(layer_match, nsid) - 12352usize];
     ["Offset of field: layer_match::is_group_leader"]
-        [::std::mem::offset_of!(layer_match, is_group_leader) - 8264usize];
+        [::std::mem::offset_of!(layer_match, is_group_leader) - 12360usize];
     ["Offset of field: layer_match::is_kthread"]
-        [::std::mem::offset_of!(layer_match, is_kthread) - 8265usize];
+        [::std::mem::offset_of!(layer_match, is_kthread) - 12361usize];
     ["Offset of field: layer_match::used_gpu_tid"]
-        [::std::mem::offset_of!(layer_match, used_gpu_tid) - 8266usize];
+        [::std::mem::offset_of!(layer_match, used_gpu_tid) - 12362usize];
     ["Offset of field: layer_match::used_gpu_pid"]
-        [::std::mem::offset_of!(layer_match, used_gpu_pid) - 8267usize];
+        [::std::mem::offset_of!(layer_match, used_gpu_pid) - 12363usize];
     ["Offset of field: layer_match::exclude"]
-        [::std::mem::offset_of!(layer_match, exclude) - 8268usize];
+        [::std::mem::offset_of!(layer_match, exclude) - 12364usize];
     ["Offset of field: layer_match::min_avg_runtime_us"]
-        [::std::mem::offset_of!(layer_match, min_avg_runtime_us) - 8272usize];
+        [::std::mem::offset_of!(layer_match, min_avg_runtime_us) - 12368usize];
     ["Offset of field: layer_match::max_avg_runtime_us"]
-        [::std::mem::offset_of!(layer_match, max_avg_runtime_us) - 8280usize];
+        [::std::mem::offset_of!(layer_match, max_avg_runtime_us) - 12376usize];
 };
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct layer_match_ands {
-    pub matches: [layer_match; 20usize],
+    pub matches: [layer_match; 21usize],
     pub nr_match_ands: ::std::os::raw::c_int,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of layer_match_ands"][::std::mem::size_of::<layer_match_ands>() - 165768usize];
+    ["Size of layer_match_ands"][::std::mem::size_of::<layer_match_ands>() - 260072usize];
     ["Alignment of layer_match_ands"][::std::mem::align_of::<layer_match_ands>() - 8usize];
     ["Offset of field: layer_match_ands::matches"]
         [::std::mem::offset_of!(layer_match_ands, matches) - 0usize];
     ["Offset of field: layer_match_ands::nr_match_ands"]
-        [::std::mem::offset_of!(layer_match_ands, nr_match_ands) - 165760usize];
+        [::std::mem::offset_of!(layer_match_ands, nr_match_ands) - 260064usize];
 };
 pub const layer_growth_algo_GROWTH_ALGO_STICKY: layer_growth_algo = 0;
 pub const layer_growth_algo_GROWTH_ALGO_LINEAR: layer_growth_algo = 1;
@@ -448,7 +444,7 @@ pub struct layer {
     pub kind: ::std::os::raw::c_int,
     pub preempt: bool,
     pub preempt_first: bool,
-    pub exclusive: bool,
+    pub excl: bool,
     pub allow_node_aligned: bool,
     pub skip_remote_node: bool,
     pub prev_over_idle_core: bool,
@@ -466,70 +462,72 @@ pub struct layer {
     pub llcs_to_drain: u64_,
     pub llc_drain_cnt: u32_,
     pub task_place: layer_task_place,
-    pub name: [::std::os::raw::c_char; 64usize],
+    pub name: [::std::os::raw::c_char; 128usize],
     pub is_protected: bool,
     pub periodically_refresh: bool,
+    pub cpuset: [u8_; 64usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of layer"][::std::mem::size_of::<layer>() - 5305128usize];
+    ["Size of layer"][::std::mem::size_of::<layer>() - 8322984usize];
     ["Alignment of layer"][::std::mem::align_of::<layer>() - 8usize];
     ["Offset of field: layer::matches"][::std::mem::offset_of!(layer, matches) - 0usize];
     ["Offset of field: layer::nr_match_ors"]
-        [::std::mem::offset_of!(layer, nr_match_ors) - 5304576usize];
-    ["Offset of field: layer::id"][::std::mem::offset_of!(layer, id) - 5304580usize];
+        [::std::mem::offset_of!(layer, nr_match_ors) - 8322304usize];
+    ["Offset of field: layer::id"][::std::mem::offset_of!(layer, id) - 8322308usize];
     ["Offset of field: layer::min_exec_ns"]
-        [::std::mem::offset_of!(layer, min_exec_ns) - 5304584usize];
+        [::std::mem::offset_of!(layer, min_exec_ns) - 8322312usize];
     ["Offset of field: layer::max_exec_ns"]
-        [::std::mem::offset_of!(layer, max_exec_ns) - 5304592usize];
+        [::std::mem::offset_of!(layer, max_exec_ns) - 8322320usize];
     ["Offset of field: layer::yield_step_ns"]
-        [::std::mem::offset_of!(layer, yield_step_ns) - 5304600usize];
-    ["Offset of field: layer::slice_ns"][::std::mem::offset_of!(layer, slice_ns) - 5304608usize];
-    ["Offset of field: layer::fifo"][::std::mem::offset_of!(layer, fifo) - 5304616usize];
-    ["Offset of field: layer::weight"][::std::mem::offset_of!(layer, weight) - 5304620usize];
+        [::std::mem::offset_of!(layer, yield_step_ns) - 8322328usize];
+    ["Offset of field: layer::slice_ns"][::std::mem::offset_of!(layer, slice_ns) - 8322336usize];
+    ["Offset of field: layer::fifo"][::std::mem::offset_of!(layer, fifo) - 8322344usize];
+    ["Offset of field: layer::weight"][::std::mem::offset_of!(layer, weight) - 8322348usize];
     ["Offset of field: layer::disallow_open_after_ns"]
-        [::std::mem::offset_of!(layer, disallow_open_after_ns) - 5304624usize];
+        [::std::mem::offset_of!(layer, disallow_open_after_ns) - 8322352usize];
     ["Offset of field: layer::disallow_preempt_after_ns"]
-        [::std::mem::offset_of!(layer, disallow_preempt_after_ns) - 5304632usize];
+        [::std::mem::offset_of!(layer, disallow_preempt_after_ns) - 8322360usize];
     ["Offset of field: layer::xllc_mig_min_ns"]
-        [::std::mem::offset_of!(layer, xllc_mig_min_ns) - 5304640usize];
-    ["Offset of field: layer::kind"][::std::mem::offset_of!(layer, kind) - 5304648usize];
-    ["Offset of field: layer::preempt"][::std::mem::offset_of!(layer, preempt) - 5304652usize];
+        [::std::mem::offset_of!(layer, xllc_mig_min_ns) - 8322368usize];
+    ["Offset of field: layer::kind"][::std::mem::offset_of!(layer, kind) - 8322376usize];
+    ["Offset of field: layer::preempt"][::std::mem::offset_of!(layer, preempt) - 8322380usize];
     ["Offset of field: layer::preempt_first"]
-        [::std::mem::offset_of!(layer, preempt_first) - 5304653usize];
-    ["Offset of field: layer::exclusive"][::std::mem::offset_of!(layer, exclusive) - 5304654usize];
+        [::std::mem::offset_of!(layer, preempt_first) - 8322381usize];
+    ["Offset of field: layer::excl"][::std::mem::offset_of!(layer, excl) - 8322382usize];
     ["Offset of field: layer::allow_node_aligned"]
-        [::std::mem::offset_of!(layer, allow_node_aligned) - 5304655usize];
+        [::std::mem::offset_of!(layer, allow_node_aligned) - 8322383usize];
     ["Offset of field: layer::skip_remote_node"]
-        [::std::mem::offset_of!(layer, skip_remote_node) - 5304656usize];
+        [::std::mem::offset_of!(layer, skip_remote_node) - 8322384usize];
     ["Offset of field: layer::prev_over_idle_core"]
-        [::std::mem::offset_of!(layer, prev_over_idle_core) - 5304657usize];
+        [::std::mem::offset_of!(layer, prev_over_idle_core) - 8322385usize];
     ["Offset of field: layer::growth_algo"]
-        [::std::mem::offset_of!(layer, growth_algo) - 5304660usize];
-    ["Offset of field: layer::nr_tasks"][::std::mem::offset_of!(layer, nr_tasks) - 5304664usize];
-    ["Offset of field: layer::cpus_seq"][::std::mem::offset_of!(layer, cpus_seq) - 5304672usize];
-    ["Offset of field: layer::node_mask"][::std::mem::offset_of!(layer, node_mask) - 5304680usize];
-    ["Offset of field: layer::llc_mask"][::std::mem::offset_of!(layer, llc_mask) - 5304688usize];
+        [::std::mem::offset_of!(layer, growth_algo) - 8322388usize];
+    ["Offset of field: layer::nr_tasks"][::std::mem::offset_of!(layer, nr_tasks) - 8322392usize];
+    ["Offset of field: layer::cpus_seq"][::std::mem::offset_of!(layer, cpus_seq) - 8322400usize];
+    ["Offset of field: layer::node_mask"][::std::mem::offset_of!(layer, node_mask) - 8322408usize];
+    ["Offset of field: layer::llc_mask"][::std::mem::offset_of!(layer, llc_mask) - 8322416usize];
     ["Offset of field: layer::check_no_idle"]
-        [::std::mem::offset_of!(layer, check_no_idle) - 5304696usize];
-    ["Offset of field: layer::perf"][::std::mem::offset_of!(layer, perf) - 5304700usize];
+        [::std::mem::offset_of!(layer, check_no_idle) - 8322424usize];
+    ["Offset of field: layer::perf"][::std::mem::offset_of!(layer, perf) - 8322428usize];
     ["Offset of field: layer::refresh_cpus"]
-        [::std::mem::offset_of!(layer, refresh_cpus) - 5304704usize];
-    ["Offset of field: layer::cpus"][::std::mem::offset_of!(layer, cpus) - 5304712usize];
-    ["Offset of field: layer::nr_cpus"][::std::mem::offset_of!(layer, nr_cpus) - 5304776usize];
+        [::std::mem::offset_of!(layer, refresh_cpus) - 8322432usize];
+    ["Offset of field: layer::cpus"][::std::mem::offset_of!(layer, cpus) - 8322440usize];
+    ["Offset of field: layer::nr_cpus"][::std::mem::offset_of!(layer, nr_cpus) - 8322504usize];
     ["Offset of field: layer::nr_llc_cpus"]
-        [::std::mem::offset_of!(layer, nr_llc_cpus) - 5304780usize];
+        [::std::mem::offset_of!(layer, nr_llc_cpus) - 8322508usize];
     ["Offset of field: layer::llcs_to_drain"]
-        [::std::mem::offset_of!(layer, llcs_to_drain) - 5305040usize];
+        [::std::mem::offset_of!(layer, llcs_to_drain) - 8322768usize];
     ["Offset of field: layer::llc_drain_cnt"]
-        [::std::mem::offset_of!(layer, llc_drain_cnt) - 5305048usize];
+        [::std::mem::offset_of!(layer, llc_drain_cnt) - 8322776usize];
     ["Offset of field: layer::task_place"]
-        [::std::mem::offset_of!(layer, task_place) - 5305052usize];
-    ["Offset of field: layer::name"][::std::mem::offset_of!(layer, name) - 5305056usize];
+        [::std::mem::offset_of!(layer, task_place) - 8322780usize];
+    ["Offset of field: layer::name"][::std::mem::offset_of!(layer, name) - 8322784usize];
     ["Offset of field: layer::is_protected"]
-        [::std::mem::offset_of!(layer, is_protected) - 5305120usize];
+        [::std::mem::offset_of!(layer, is_protected) - 8322912usize];
     ["Offset of field: layer::periodically_refresh"]
-        [::std::mem::offset_of!(layer, periodically_refresh) - 5305121usize];
+        [::std::mem::offset_of!(layer, periodically_refresh) - 8322913usize];
+    ["Offset of field: layer::cpuset"][::std::mem::offset_of!(layer, cpuset) - 8322914usize];
 };
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
