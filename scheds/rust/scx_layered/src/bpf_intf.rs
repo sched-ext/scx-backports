@@ -69,7 +69,8 @@ pub const global_stat_id_GSTAT_LO_FB_USAGE: global_stat_id = 5;
 pub const global_stat_id_GSTAT_FB_CPU_USAGE: global_stat_id = 6;
 pub const global_stat_id_GSTAT_ANTISTALL: global_stat_id = 7;
 pub const global_stat_id_GSTAT_SKIP_PREEMPT: global_stat_id = 8;
-pub const global_stat_id_NR_GSTATS: global_stat_id = 9;
+pub const global_stat_id_GSTAT_FIXUP_VTIME: global_stat_id = 9;
+pub const global_stat_id_NR_GSTATS: global_stat_id = 10;
 pub type global_stat_id = ::std::os::raw::c_uint;
 pub const layer_stat_id_LSTAT_SEL_LOCAL: layer_stat_id = 0;
 pub const layer_stat_id_LSTAT_ENQ_LOCAL: layer_stat_id = 1;
@@ -150,7 +151,7 @@ pub struct cpu_ctx {
     pub used_at: u64_,
     pub is_protected: bool,
     pub layer_usages: [[u64_; 4usize]; 16usize],
-    pub gstats: [u64_; 9usize],
+    pub gstats: [u64_; 10usize],
     pub lstats: [[u64_; 31usize]; 16usize],
     pub ran_current_for: u64_,
     pub usage: u64_,
@@ -176,7 +177,7 @@ pub struct cpu_ctx {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of cpu_ctx"][::std::mem::size_of::<cpu_ctx>() - 6096usize];
+    ["Size of cpu_ctx"][::std::mem::size_of::<cpu_ctx>() - 6104usize];
     ["Alignment of cpu_ctx"][::std::mem::align_of::<cpu_ctx>() - 8usize];
     ["Offset of field: cpu_ctx::cpu"][::std::mem::offset_of!(cpu_ctx, cpu) - 0usize];
     ["Offset of field: cpu_ctx::current_preempt"]
@@ -205,42 +206,42 @@ const _: () = {
     ["Offset of field: cpu_ctx::layer_usages"]
         [::std::mem::offset_of!(cpu_ctx, layer_usages) - 32usize];
     ["Offset of field: cpu_ctx::gstats"][::std::mem::offset_of!(cpu_ctx, gstats) - 544usize];
-    ["Offset of field: cpu_ctx::lstats"][::std::mem::offset_of!(cpu_ctx, lstats) - 616usize];
+    ["Offset of field: cpu_ctx::lstats"][::std::mem::offset_of!(cpu_ctx, lstats) - 624usize];
     ["Offset of field: cpu_ctx::ran_current_for"]
-        [::std::mem::offset_of!(cpu_ctx, ran_current_for) - 4584usize];
-    ["Offset of field: cpu_ctx::usage"][::std::mem::offset_of!(cpu_ctx, usage) - 4592usize];
+        [::std::mem::offset_of!(cpu_ctx, ran_current_for) - 4592usize];
+    ["Offset of field: cpu_ctx::usage"][::std::mem::offset_of!(cpu_ctx, usage) - 4600usize];
     ["Offset of field: cpu_ctx::usage_at_idle"]
-        [::std::mem::offset_of!(cpu_ctx, usage_at_idle) - 4600usize];
+        [::std::mem::offset_of!(cpu_ctx, usage_at_idle) - 4608usize];
     ["Offset of field: cpu_ctx::hi_fb_dsq_id"]
-        [::std::mem::offset_of!(cpu_ctx, hi_fb_dsq_id) - 4608usize];
+        [::std::mem::offset_of!(cpu_ctx, hi_fb_dsq_id) - 4616usize];
     ["Offset of field: cpu_ctx::lo_fb_dsq_id"]
-        [::std::mem::offset_of!(cpu_ctx, lo_fb_dsq_id) - 4616usize];
+        [::std::mem::offset_of!(cpu_ctx, lo_fb_dsq_id) - 4624usize];
     ["Offset of field: cpu_ctx::in_open_layers"]
-        [::std::mem::offset_of!(cpu_ctx, in_open_layers) - 4624usize];
-    ["Offset of field: cpu_ctx::layer_id"][::std::mem::offset_of!(cpu_ctx, layer_id) - 4628usize];
+        [::std::mem::offset_of!(cpu_ctx, in_open_layers) - 4632usize];
+    ["Offset of field: cpu_ctx::layer_id"][::std::mem::offset_of!(cpu_ctx, layer_id) - 4636usize];
     ["Offset of field: cpu_ctx::task_layer_id"]
-        [::std::mem::offset_of!(cpu_ctx, task_layer_id) - 4632usize];
-    ["Offset of field: cpu_ctx::llc_id"][::std::mem::offset_of!(cpu_ctx, llc_id) - 4636usize];
-    ["Offset of field: cpu_ctx::node_id"][::std::mem::offset_of!(cpu_ctx, node_id) - 4640usize];
-    ["Offset of field: cpu_ctx::perf"][::std::mem::offset_of!(cpu_ctx, perf) - 4644usize];
-    ["Offset of field: cpu_ctx::lo_fb_seq"][::std::mem::offset_of!(cpu_ctx, lo_fb_seq) - 4648usize];
+        [::std::mem::offset_of!(cpu_ctx, task_layer_id) - 4640usize];
+    ["Offset of field: cpu_ctx::llc_id"][::std::mem::offset_of!(cpu_ctx, llc_id) - 4644usize];
+    ["Offset of field: cpu_ctx::node_id"][::std::mem::offset_of!(cpu_ctx, node_id) - 4648usize];
+    ["Offset of field: cpu_ctx::perf"][::std::mem::offset_of!(cpu_ctx, perf) - 4652usize];
+    ["Offset of field: cpu_ctx::lo_fb_seq"][::std::mem::offset_of!(cpu_ctx, lo_fb_seq) - 4656usize];
     ["Offset of field: cpu_ctx::lo_fb_seq_at"]
-        [::std::mem::offset_of!(cpu_ctx, lo_fb_seq_at) - 4656usize];
+        [::std::mem::offset_of!(cpu_ctx, lo_fb_seq_at) - 4664usize];
     ["Offset of field: cpu_ctx::lo_fb_usage_base"]
-        [::std::mem::offset_of!(cpu_ctx, lo_fb_usage_base) - 4664usize];
+        [::std::mem::offset_of!(cpu_ctx, lo_fb_usage_base) - 4672usize];
     ["Offset of field: cpu_ctx::ogp_layer_order"]
-        [::std::mem::offset_of!(cpu_ctx, ogp_layer_order) - 4672usize];
+        [::std::mem::offset_of!(cpu_ctx, ogp_layer_order) - 4680usize];
     ["Offset of field: cpu_ctx::ogn_layer_order"]
-        [::std::mem::offset_of!(cpu_ctx, ogn_layer_order) - 4736usize];
+        [::std::mem::offset_of!(cpu_ctx, ogn_layer_order) - 4744usize];
     ["Offset of field: cpu_ctx::op_layer_order"]
-        [::std::mem::offset_of!(cpu_ctx, op_layer_order) - 4800usize];
+        [::std::mem::offset_of!(cpu_ctx, op_layer_order) - 4808usize];
     ["Offset of field: cpu_ctx::on_layer_order"]
-        [::std::mem::offset_of!(cpu_ctx, on_layer_order) - 4864usize];
+        [::std::mem::offset_of!(cpu_ctx, on_layer_order) - 4872usize];
     ["Offset of field: cpu_ctx::gp_layer_order"]
-        [::std::mem::offset_of!(cpu_ctx, gp_layer_order) - 4928usize];
+        [::std::mem::offset_of!(cpu_ctx, gp_layer_order) - 4936usize];
     ["Offset of field: cpu_ctx::gn_layer_order"]
-        [::std::mem::offset_of!(cpu_ctx, gn_layer_order) - 4992usize];
-    ["Offset of field: cpu_ctx::prox_map"][::std::mem::offset_of!(cpu_ctx, prox_map) - 5056usize];
+        [::std::mem::offset_of!(cpu_ctx, gn_layer_order) - 5000usize];
+    ["Offset of field: cpu_ctx::prox_map"][::std::mem::offset_of!(cpu_ctx, prox_map) - 5064usize];
 };
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
