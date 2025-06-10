@@ -29,6 +29,7 @@ use libbpf_rs::ProgramInput;
 use log::warn;
 use log::{debug, info};
 use scx_stats::prelude::*;
+use scx_utils::autopower::*;
 //use scx_utils::build_id;
 use scx_utils::compat;
 use scx_utils::pm::{cpu_idle_resume_latency_supported, update_cpu_idle_resume_latency};
@@ -269,7 +270,7 @@ impl<'a> Scheduler<'a> {
         let topo = Topology::new().unwrap();
 
         // Check host topology to determine if we need to enable SMT capabilities.
-
+        let smt_enabled = topo.smt_enabled;
         // info!(
         //     "{} {} {}",
         //     SCHEDULER_NAME,
