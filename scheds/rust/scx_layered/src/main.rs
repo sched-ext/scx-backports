@@ -43,7 +43,6 @@ use nvml_wrapper::Nvml;
 use once_cell::sync::OnceCell;
 use scx_layered::*;
 use scx_stats::prelude::*;
-use scx_utils::build_id;
 use scx_utils::compat;
 use scx_utils::init_libbpf_logging;
 use scx_utils::pm::{cpu_idle_resume_latency_supported, update_cpu_idle_resume_latency};
@@ -3227,8 +3226,8 @@ fn main() -> Result<()> {
 
     if opts.version {
         println!(
-            "scx_layered {}",
-            build_id::full_version(env!("CARGO_PKG_VERSION"))
+            "scx_layered naw",
+            //build_id::full_version(env!("CARGO_PKG_VERSION"))
         );
         return Ok(());
     }
