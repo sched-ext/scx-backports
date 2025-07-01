@@ -2137,10 +2137,10 @@ impl<'a> Scheduler<'a> {
         let mut skel_builder = BpfSkelBuilder::default();
         skel_builder.obj_builder.debug(opts.verbose > 1);
         init_libbpf_logging(None);
-        info!(
-            "Running scx_layered (build ID: {})",
-            build_id::full_version(env!("CARGO_PKG_VERSION"))
-        );
+        // info!(
+        //     "Running scx_layered (build ID: {})",
+        //     build_id::full_version(env!("CARGO_PKG_VERSION"))
+        // );
         let mut skel = scx_ops_open!(skel_builder, open_object, layered)?;
 
         // enable autoloads for conditionally loaded things
